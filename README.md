@@ -78,3 +78,18 @@ Tras regenerar, comprueba que no se ha escapado nada en claro:
 ```bash
 grep -ci 'PALABRA_DE_PRUEBA' index.html   # debe devolver 0
 ```
+
+## `app.html` — versión conectada a Capa 3
+
+Página del cuadro de mando contra Supabase: acceso por enlace mágico (sin
+contraseñas), datos en vivo desde `v_opportunity_scores`, `v_pendientes` y
+`scope_flags`, y puntuación abierta o cerrada según el rol que devuelve
+`app_members`.
+
+La clave *publishable* va en `app.js` a la vista, a propósito: está diseñada
+para el navegador. Lo que protege los datos son las políticas RLS. La interfaz
+oculta controles a un `reader` por cortesía; quien deniega es Postgres.
+
+Convive con `index.html` (la versión estática cifrada) hasta que se verifique
+contra el proyecto real. Entonces `app.html` pasa a ser la página principal y
+se retiran el cifrado y `tools/build.js`.

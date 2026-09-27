@@ -273,6 +273,44 @@ async function saveScore() {
 }
 
 
+
+// ── ESCRITURA ───────────────────────────────────────────────────────
+// Envoltorio unico para todo lo que escribe: mensaje legible, recarga y
+// repintado. El 42501 de Postgres es el rechazo de una politica RLS; sin
+// traducirlo, el usuario solo veria una cadena cruda del driver.
+async function guardar(msgEl, btnEl, fn, textoOk = 'GUARDADO.') {
+  if (btnEl) btnEl.disabled = true;
+  if (msgEl) { msgEl.className = 'frm-msg'; msgEl.textContent = 'GUARDANDO…'; }
+  try {
+    const { error } = await fn();
+    if (error) throw error;
+    await loadAll();
+    renderAll();
+    const m = $(msgEl?.id); if (m) { m.className = 'frm-msg ok'; m.textContent = textoOk; }
+  } catch (err) {
+    if (btnEl) btnEl.disabled = false;
+    if (msgEl) {
+      msgEl.className = 'frm-msg err';
+      msgEl.textContent = err?.code === '42501'
+        ? 'LA BASE HA RECHAZADO LA ESCRITURA: TU ROL NO PUEDE EDITAR.'
+        : 'NO SE PUDO GUARDAR: ' + String(err?.message ?? err).toUpperCase();
+    }
+  }
+}
+
+const val = (id) => { const e = $(id); return e ? e.value.trim() : ''; };
+const num = (id) => { const v = val(id); return v === '' ? null : Number(v); };
+const chk = (id) => { const e = $(id); return e ? e.checked : false; };
+
+const campo = (id, etiqueta, tipo = 'text', extra = '') =>
+  `<div class="fld"><label for="${id}">${etiqueta}</label>
+   <input id="${id}" type="${tipo}" ${extra} /></div>`;
+const area = (id, etiqueta, v = '') =>
+  `<div class="fld ancho"><label for="${id}">${etiqueta}</label>
+   <textarea id="${id}">${esc(v ?? '')}</textarea></div>`;
+const opciones = (mapa, sel) => Object.entries(mapa)
+  .map(([k, t]) => `<option value="${esc(k)}"${k === sel ? ' selected' : ''}>${esc(t)}</option>`).join('');
+
 // ── 4 · DATA ROOM ───────────────────────────────────────────────────
 const CATS = {
   registral:'Registral', catastral:'Catastral', tecnico:'Técnico',
@@ -298,11 +336,36 @@ function drDocumentos(id) {
       <div class="dr-grid">${items.map(d => `
         <article class="doc">
           <div><h4>${esc(d.titulo)}</h4>${d.descripcion ? `<p>${esc(d.descripcion)}</p>` : ''}</div>
-          ${d.url
-            ? `<a href="${esc(d.url)}" target="_blank" rel="noopener">ABRIR DOCUMENTO</a>`
-            : `<div class="pend">▲ ${esc(String(d.estado).toUpperCase())}</div>`}
+          <div>
+            ${d.url
+              ? `<a href="${esc(d.url)}" target="_blank" rel="noopener">ABRIR DOCUMENTO</a>`
+              : `<div class="pend">▲ ${esc(String(d.estado).toUpperCase())}</div>`}
+            ${canWrite() ? `<div class="fila-acc" style="margin-top:9px">
+              <button class="btn-mini" data-del-doc="${esc(d.id)}">ELIMINAR</button></div>` : ''}
+          </div>
         </article>`).join('')}</div>`;
-  }).join('');
+  }).join('') + formDocumento();
+}
+
+function formDocumento() {
+  if (!canWrite()) return '';
+  return `<div class="frm">
+    <h4>Añadir documento</h4>
+    <div class="frm-grid">
+      <div class="fld"><label for="dTit">Título</label><input id="dTit" type="text" /></div>
+      <div class="fld"><label for="dCat">Categoría</label>
+        <select id="dCat">${opciones(CATS, 'otros')}</select></div>
+      <div class="fld"><label for="dEst">Estado</label>
+        <select id="dEst">${opciones({disponible:'Disponible',pendiente:'Pendiente',solicitado:'Solicitado'},'disponible')}</select></div>
+      <div class="fld"><label for="dOrd">Orden</label><input id="dOrd" type="number" value="99" /></div>
+      <div class="fld ancho"><label for="dUrl">Enlace</label><input id="dUrl" type="text"
+        placeholder="https://drive.google.com/…" />
+        <span class="pista">Déjalo vacío si el documento aún no existe: se registra como hueco declarado.</span></div>
+      <div class="fld ancho"><label for="dDes">Descripción</label><textarea id="dDes"></textarea></div>
+    </div>
+    <button class="btn-oro" id="dAdd">AÑADIR DOCUMENTO</button>
+    <div class="frm-msg" id="dMsg"></div>
+  </div>`;
 }
 
 function drEconomics(id) {
@@ -325,16 +388,59 @@ function drEconomics(id) {
     ${fila('Exclusividad', e && e.exclusividad != null ? (e.exclusividad ? 'Sí' : 'No') : null)}
     ${fila('Duración', e && e.duracion_meses != null ? e.duracion_meses + ' meses' : null)}
     ${fila('Mandato', m ? `${esc(m.tipo ?? 'vivo')}${m.vence_en ? ' · vence ' + esc(m.vence_en) : ''}` : null)}
-  </dl>${e && e.notas ? `<div class="prosa" style="margin-top:14px"><h4>Notas</h4><p>${esc(e.notas)}</p></div>` : ''}`;
+  </dl>${e && e.notas ? `<div class="prosa" style="margin-top:14px"><h4>Notas</h4><p>${esc(e.notas)}</p></div>` : ''}
+  ${formEconomics(id, e)}`;
+}
+
+function formEconomics(id, e) {
+  if (!canWrite()) return '';
+  const v = (x) => x == null ? '' : x;
+  return `<div class="frm">
+    <h4>Editar economics</h4>
+    <div class="frm-grid">
+      ${campo('eMin','EV mínimo (€)','number',`value="${v(e?.ev_min_eur)}"`)}
+      ${campo('eMax','EV máximo (€)','number',`value="${v(e?.ev_max_eur)}"`)}
+      ${campo('ePre','Precio objetivo (€)','number',`value="${v(e?.precio_objetivo_eur)}"`)}
+      ${campo('eRet','Retainer (€)','number',`value="${v(e?.retainer_eur)}"`)}
+      ${campo('eExP','Éxito (%)','number',`step="0.01" value="${v(e?.exito_pct)}"`)}
+      ${campo('eExM','Éxito mínimo (€)','number',`value="${v(e?.exito_min_eur)}"`)}
+      ${campo('eDur','Duración (meses)','number',`value="${v(e?.duracion_meses)}"`)}
+      <div class="fld check"><input id="eExc" type="checkbox" ${e?.exclusividad ? 'checked' : ''} />
+        <label for="eExc">Mandato en exclusiva</label></div>
+      <div class="fld ancho check"><input id="ePub" type="checkbox" ${e?.precio_publicado ? 'checked' : ''} />
+        <label for="ePub">Autorizar la divulgación del precio</label></div>
+      <div class="fld ancho"><div class="aviso-precio">Mientras esta casilla esté desmarcada, el precio
+        <b>no sale de la base de datos</b>: la vista lo oculta. Márcala sólo al pasar a
+        cualificación de inversor o EOI.</div></div>
+      ${area('eNot','Notas', e?.notas)}
+    </div>
+    <button class="btn-oro" id="eSave">GUARDAR ECONOMICS</button>
+    <div class="frm-msg" id="eMsg"></div>
+  </div>`;
 }
 
 function drEstrategia(id) {
   const s = state.strat.find(x => x.opportunity_id === id);
-  if (!s) return vacio('Sin estrategia registrada para este expediente.');
+  if (!s) return vacio('Sin estrategia registrada para este expediente.') + formEstrategia(id, null);
   const bloque = (t, v) => v ? `<div class="prosa"><h4>${t}</h4><p>${esc(v)}</p></div>` : '';
   const html = bloque('Ángulo · por qué ZRC', s.angulo) + bloque('Comprador objetivo', s.comprador_tipo)
              + bloque('Proceso', s.proceso) + bloque('Riesgos', s.riesgos);
-  return html || vacio('La estrategia existe pero está vacía.');
+  return (html || vacio('La estrategia existe pero está vacía.')) + formEstrategia(id, s);
+}
+
+function formEstrategia(id, s) {
+  if (!canWrite()) return '';
+  return `<div class="frm">
+    <h4>${s ? 'Editar' : 'Registrar'} estrategia</h4>
+    <div class="frm-grid">
+      ${area('sAng','Ángulo · la respuesta de una frase a «por qué ZRC»', s?.angulo)}
+      ${area('sCom','Comprador objetivo', s?.comprador_tipo)}
+      ${area('sPro','Proceso', s?.proceso)}
+      ${area('sRie','Riesgos', s?.riesgos)}
+    </div>
+    <button class="btn-oro" id="sSave">GUARDAR ESTRATEGIA</button>
+    <div class="frm-msg" id="sMsg"></div>
+  </div>`;
 }
 
 function drInversores(id) {
@@ -351,9 +457,35 @@ function drInversores(id) {
         ${i.geo ? `<div class="td-code">${esc(i.geo)}</div>` : ''}</td>
         <td><span class="td-vert">${esc(i.tipo ?? '—')}</span></td>
         <td><span class="td-code">${tk}</span></td>
-        <td><span class="pill ${o.estado === 'descartado' ? 'pill-DESCARTE' : 'pill-P2'}">${esc(EST_INV[o.estado] ?? o.estado)}</span></td>
-        <td><span class="td-code">${esc(o.ultimo_contacto ?? '—')}</span></td></tr>`;
-    }).join('')}</tbody></table></div>`;
+        <td>${canWrite()
+          ? `<select class="io-est" data-inv="${esc(o.investor_id)}">${opciones(EST_INV, o.estado)}</select>`
+          : `<span class="pill ${o.estado === 'descartado' ? 'pill-DESCARTE' : 'pill-P2'}">${esc(EST_INV[o.estado] ?? o.estado)}</span>`}</td>
+        <td><span class="td-code">${esc(o.ultimo_contacto ?? '—')}</span>
+          ${canWrite() ? `<button class="btn-mini" style="margin-left:8px" data-del-inv="${esc(o.investor_id)}">QUITAR</button>` : ''}</td></tr>`;
+    }).join('')}</tbody></table></div>` + formInversor();
+}
+
+function formInversor() {
+  if (!canWrite()) return '';
+  return `<div class="frm">
+    <h4>Añadir inversor potencial</h4>
+    <div class="frm-grid">
+      ${campo('iNom','Nombre')}
+      <div class="fld"><label for="iTip">Tipo</label><select id="iTip">${opciones({
+        'family office':'Family office', fondo:'Fondo', industrial:'Industrial',
+        patrimonialista:'Patrimonialista', promotor:'Promotor',
+        institucional:'Institucional', otro:'Otro' }, 'family office')}</select></div>
+      ${campo('iGeo','Geografía','text','placeholder="ES"')}
+      ${campo('iMin','Ticket mínimo (€)','number')}
+      ${campo('iMax','Ticket máximo (€)','number')}
+      <div class="fld"><label for="iEst">Estado</label><select id="iEst">${opciones(EST_INV,'identificado')}</select></div>
+      ${campo('iPri','Prioridad','number','value="5"')}
+      <div class="fld ancho"><span class="pista">Si el inversor ya existe en el maestro, se reutiliza
+        su ficha y sólo se añade el vínculo con este expediente.</span></div>
+    </div>
+    <button class="btn-oro" id="iAdd">AÑADIR INVERSOR</button>
+    <div class="frm-msg" id="iMsg"></div>
+  </div>`;
 }
 
 const DR_TABS = [
@@ -384,6 +516,82 @@ function renderDataroom() {
 
   const fn = (DR_TABS.find(([k]) => k === state.drTab) ?? DR_TABS[0])[2];
   $('drBody').innerHTML = fn(r.opportunity_id);
+  if (canWrite()) cablearFormularios(r.opportunity_id);
+}
+
+function cablearFormularios(id) {
+  const uid = () => sb.auth.getUser().then(r => r.data.user.id);
+
+  $('dAdd')?.addEventListener('click', async (ev) => {
+    if (!val('dTit')) { const m = $('dMsg'); m.className = 'frm-msg err'; m.textContent = 'EL TÍTULO ES OBLIGATORIO.'; return; }
+    const autor = await uid();
+    guardar($('dMsg'), ev.target, () => sb.from('documents').insert({
+      opportunity_id: id, titulo: val('dTit'), categoria: val('dCat'),
+      estado: val('dEst'), orden: num('dOrd') ?? 99,
+      url: val('dUrl') || null, descripcion: val('dDes') || null, anadido_por: autor
+    }), 'DOCUMENTO AÑADIDO.');
+  });
+
+  for (const b of document.querySelectorAll('[data-del-doc]')) {
+    b.addEventListener('click', (ev) => guardar(null, ev.target,
+      () => sb.from('documents').delete().eq('id', b.dataset.delDoc)));
+  }
+
+  $('eSave')?.addEventListener('click', (ev) => guardar($('eMsg'), ev.target,
+    () => sb.from('economics').upsert({
+      opportunity_id: id, ev_min_eur: num('eMin'), ev_max_eur: num('eMax'),
+      precio_objetivo_eur: num('ePre'), precio_publicado: chk('ePub'),
+      retainer_eur: num('eRet'), exito_pct: num('eExP'), exito_min_eur: num('eExM'),
+      exclusividad: chk('eExc'), duracion_meses: num('eDur'),
+      notas: val('eNot') || null, actualizado_en: new Date().toISOString()
+    }), 'ECONOMICS GUARDADO.'));
+
+  $('sSave')?.addEventListener('click', (ev) => guardar($('sMsg'), ev.target,
+    () => sb.from('strategy').upsert({
+      opportunity_id: id, angulo: val('sAng') || null, comprador_tipo: val('sCom') || null,
+      proceso: val('sPro') || null, riesgos: val('sRie') || null,
+      actualizado_en: new Date().toISOString()
+    }), 'ESTRATEGIA GUARDADA.'));
+
+  $('iAdd')?.addEventListener('click', async (ev) => {
+    const msg = $('iMsg');
+    if (!val('iNom')) { msg.className = 'frm-msg err'; msg.textContent = 'EL NOMBRE ES OBLIGATORIO.'; return; }
+    ev.target.disabled = true; msg.className = 'frm-msg'; msg.textContent = 'GUARDANDO…';
+    try {
+      // El maestro tiene nombre unico: un inversor ya conocido se reutiliza
+      // en vez de duplicarse, y el vinculo con el expediente es lo que se crea.
+      const { data: inv, error: e1 } = await sb.from('investors').upsert({
+        nombre: val('iNom'), tipo: val('iTip'), geo: val('iGeo') || null,
+        ticket_min_eur: num('iMin'), ticket_max_eur: num('iMax')
+      }, { onConflict: 'nombre' }).select('id').single();
+      if (e1) throw e1;
+      const { error: e2 } = await sb.from('investor_outreach').upsert({
+        opportunity_id: id, investor_id: inv.id, estado: val('iEst'),
+        prioridad: num('iPri'), actualizado_en: new Date().toISOString()
+      });
+      if (e2) throw e2;
+      await loadAll(); renderAll();
+      const m = $('iMsg'); if (m) { m.className = 'frm-msg ok'; m.textContent = 'INVERSOR AÑADIDO.'; }
+    } catch (err) {
+      ev.target.disabled = false;
+      msg.className = 'frm-msg err';
+      msg.textContent = err?.code === '42501'
+        ? 'LA BASE HA RECHAZADO LA ESCRITURA: TU ROL NO PUEDE EDITAR.'
+        : 'NO SE PUDO GUARDAR: ' + String(err?.message ?? err).toUpperCase();
+    }
+  });
+
+  for (const sel of document.querySelectorAll('.io-est')) {
+    sel.addEventListener('change', () => guardar(null, null,
+      () => sb.from('investor_outreach').update({
+        estado: sel.value, actualizado_en: new Date().toISOString()
+      }).eq('opportunity_id', id).eq('investor_id', sel.dataset.inv)));
+  }
+  for (const b of document.querySelectorAll('[data-del-inv]')) {
+    b.addEventListener('click', (ev) => guardar(null, ev.target,
+      () => sb.from('investor_outreach').delete()
+        .eq('opportunity_id', id).eq('investor_id', b.dataset.delInv)));
+  }
 }
 
 // ── RENDER ──────────────────────────────────────────────────────────

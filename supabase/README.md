@@ -108,3 +108,22 @@ a su estado anterior. No hay que tocar los datos.
 **Arreglo de fondo, pendiente**: mover ZRC OS a un esquema propio (`zrcos`),
 dentro de este mismo proyecto. Elimina la clase entera de problema y conserva
 una sola identidad para todo ZRC.
+
+## Edición del data room desde la página
+
+Un `writer` o `admin` puede dar de alta y editar documentos, economics,
+estrategia e inversores sin pasar por SQL. Un `reader` no recibe ninguno de
+esos formularios.
+
+Eso es cortesía de la interfaz. Quien deniega sigue siendo Postgres: si una
+escritura llegara igualmente, la política RLS la rechaza con el código `42501`
+y la página lo traduce a un mensaje legible en vez de un fallo mudo.
+
+Dos detalles que conviene no perder al tocar este código:
+
+- **Toda escritura va acotada.** Los borrados y actualizaciones encadenan su
+  `.eq()`; sin él, un `delete()` alcanzaría todas las filas visibles para ese
+  usuario.
+- **La casilla de divulgación del precio.** Marcarla es lo único que hace que
+  el precio salga de la base. El formulario lo advierte junto a la casilla,
+  porque es una decisión de proceso, no un campo más.

@@ -20,7 +20,8 @@ const esc = (s) => String(s ?? '').replace(/[&<>"']/g,
 const state = {
   rol: null, email: null,
   rows: [], flags: [], pend: [], dims: [], bands: [],
-  docs: [], econ: [], strat: [], outreach: [], mand: [], drError: null,
+  docs: [], econ: [], strat: [], outreach: [], mand: [], check: [], drError: null,
+  ckPrio: '', ckEst: '',
   rubrics: [], gates: [], risk: [], doctError: null,
   miembros: [], accesos: [],
   drTab: 'documentos',
@@ -116,24 +117,26 @@ async function loadAll() {
   // tablas no existen — y eso no puede dejar en blanco el cuadro de mando
   // entero. Se degrada a una seccion que explica que falta.
   try {
-    const [docs, econ, strat, outreach, mand] = await Promise.all([
+    const [docs, econ, strat, outreach, mand, chk] = await Promise.all([
       sb.from('documents').select('*').order('orden'),
       sb.from('v_economics').select('*'),
       sb.from('strategy').select('*'),
       // PostgREST resuelve el inversor por la clave foranea: una consulta, no dos.
       sb.from('investor_outreach').select('*, investors(nombre,tipo,geo,ticket_min_eur,ticket_max_eur)'),
-      sb.from('mandates').select('*')
+      sb.from('mandates').select('*'),
+      sb.from('checklist_items').select('*').order('orden')
     ]);
-    const fallo = [docs, econ, strat, outreach, mand].find(r => r.error);
+    const fallo = [docs, econ, strat, outreach, mand, chk].find(r => r.error);
     if (fallo) throw fallo.error;
     state.docs = docs.data ?? [];
     state.econ = econ.data ?? [];
     state.strat = strat.data ?? [];
     state.outreach = outreach.data ?? [];
     state.mand = mand.data ?? [];
+    state.check = chk.data ?? [];
     state.drError = null;
   } catch (err) {
-    state.docs = []; state.econ = []; state.strat = []; state.outreach = []; state.mand = [];
+    state.docs = []; state.econ = []; state.strat = []; state.outreach = []; state.mand = []; state.check = [];
     state.drError = String(err?.message ?? err);
   }
   if (state.selected == null && state.rows.length) {
@@ -223,6 +226,7 @@ const MOTIVO = {
   // La banda fija la accion por si sola: no hace falta ningun aviso ni
   // ninguna carencia para que un P1 exija trabajo hoy.
   banda_alta:          ['Banda alta', 'La acción y el plazo los fija la banda.'],
+  checklist_critico:   ['Checklist crítico', 'Validar antes de abrir la sala de datos.'],
   sin_codigo:          ['Sin código de expediente', 'Asignar código con el patrón del manual (§12.3).'],
   sin_puntuar:         ['Sin puntuar', 'Puntuar contra las rúbricas ancladas.']
 };
@@ -727,11 +731,57 @@ function formInversor() {
   </div>`;
 }
 
+const CK_EST = { pendiente:'Pendiente', solicitado:'Solicitado', recibido:'Recibido', validado:'Validado' };
+const CK_PRIO = { critica:'Crítica', alta:'Alta', media:'Media' };
+const CK_ORIG = { informe_valoracion:'Informe valoración', cuaderno:'Cuaderno',
+                  valoracion:'Valoración', dd_recomendada:'DD recomendada' };
+
+function drChecklist(id) {
+  const todos = state.check.filter(c => c.opportunity_id === id);
+  if (!todos.length) return vacio('Sin checklist de preparación para este expediente.');
+
+  const val = todos.filter(c => c.estado === 'validado').length;
+  const crit = todos.filter(c => c.prioridad === 'critica' && c.estado !== 'validado').length;
+  const pct = Math.round(100 * val / todos.length);
+
+  const vis = todos.filter(c =>
+    (!state.ckPrio || c.prioridad === state.ckPrio) &&
+    (!state.ckEst  || c.estado === state.ckEst));
+
+  const opc = (m, sel) => Object.entries(m)
+    .map(([k,t]) => `<option value="${esc(k)}"${k===sel?' selected':''}>${esc(t)}</option>`).join('');
+
+  const cab = `<div class="ck-cab">
+    <select id="ckPrio"><option value="">TODAS LAS PRIORIDADES</option>${opc(CK_PRIO, state.ckPrio)}</select>
+    <select id="ckEst"><option value="">TODOS LOS ESTADOS</option>${opc(CK_EST, state.ckEst)}</select>
+    <span class="toolbar-count">${vis.length} DE ${todos.length}${
+      crit ? ` · <b style="color:var(--red)">${crit} CRÍTICOS ABIERTOS</b>` : ''}</span>
+    <div class="ck-prog"><b>${val} / ${todos.length} validados</b>
+      <div class="ck-bar"><i style="width:${pct}%"></i></div></div>
+  </div>`;
+
+  const filas = vis.map(c => `<tr>
+    <td><span class="ck-num">${String(c.orden).padStart(2,'0')}</span></td>
+    <td><div class="ck-area">${esc(c.area)}</div>
+        <div style="font-size:13px;color:var(--text);margin-top:3px">${esc(c.descripcion)}</div></td>
+    <td><span class="pill p-${esc(c.prioridad)}">${esc(CK_PRIO[c.prioridad] ?? c.prioridad)}</span></td>
+    <td><span class="td-code">${esc(CK_ORIG[c.origen] ?? c.origen)}</span></td>
+    <td>${canWrite()
+      ? `<select class="ck-est e-${esc(c.estado)}" data-ck="${esc(c.id)}">${opc(CK_EST, c.estado)}</select>`
+      : `<span class="td-code e-${esc(c.estado)}">${esc(CK_EST[c.estado] ?? c.estado)}</span>`}</td>
+  </tr>`).join('');
+
+  return cab + `<div class="table-scroll"><table class="pipe"><thead><tr>
+    <th>#</th><th>Área · documento o información</th><th>Prioridad</th><th>Origen</th><th>Estado</th>
+  </tr></thead><tbody>${filas}</tbody></table></div>`;
+}
+
 const DR_TABS = [
   ['documentos', 'DOCUMENTACIÓN', drDocumentos],
   ['economics',  'ECONOMICS · MANDATO', drEconomics],
   ['estrategia', 'ESTRATEGIA', drEstrategia],
-  ['inversores', 'INVERSORES', drInversores]
+  ['inversores', 'INVERSORES', drInversores],
+  ['checklist',  'CHECKLIST', drChecklist]
 ];
 
 function renderDataroom() {
@@ -754,7 +804,8 @@ function renderDataroom() {
     documentos: state.docs.filter(d => d.opportunity_id === r.opportunity_id).length,
     economics:  state.econ.some(e => e.opportunity_id === r.opportunity_id) ? 1 : 0,
     estrategia: state.strat.some(e => e.opportunity_id === r.opportunity_id) ? 1 : 0,
-    inversores: state.outreach.filter(o => o.opportunity_id === r.opportunity_id).length
+    inversores: state.outreach.filter(o => o.opportunity_id === r.opportunity_id).length,
+    checklist:  state.check.filter(c => c.opportunity_id === r.opportunity_id).length
   };
 
   $('drTabs').innerHTML = DR_TABS.map(([k, label]) =>
@@ -766,7 +817,19 @@ function renderDataroom() {
 
   const fn = (DR_TABS.find(([k]) => k === state.drTab) ?? DR_TABS[0])[2];
   $('drBody').innerHTML = fn(r.opportunity_id);
+  cablearChecklist();
   if (canWrite()) cablearFormularios(r.opportunity_id);
+}
+
+function cablearChecklist() {
+  $('ckPrio')?.addEventListener('change', function () { state.ckPrio = this.value; renderDataroom(); });
+  $('ckEst') ?.addEventListener('change', function () { state.ckEst  = this.value; renderDataroom(); });
+  for (const sel of document.querySelectorAll('.ck-est')) {
+    sel.addEventListener('change', () => guardar(null, null,
+      () => sb.from('checklist_items').update({
+        estado: sel.value, actualizado_en: new Date().toISOString()
+      }).eq('id', sel.dataset.ck)));
+  }
 }
 
 function cablearFormularios(id) {

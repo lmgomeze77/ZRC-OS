@@ -395,6 +395,23 @@ table.pipe td { padding: 11px 12px; vertical-align: middle; font-size: 13.5px; }
 .acc-fila b { color: var(--cream); font-weight: 500; }
 .acc-fila .rolepill { margin-left: auto; }
 .pill-RESERVADO { color: var(--red); }
+
+/* ── CHECKLIST ────────────────────────────────────────────────────────── */
+.ck-cab { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-bottom: 14px; }
+.ck-cab select { background: var(--panel-2); border: 1px solid var(--line); color: var(--text);
+  font-family: var(--mono); font-size: 10px; letter-spacing: .8px; padding: 7px 10px; border-radius: 2px; }
+.ck-prog { margin-left: auto; min-width: 210px; }
+.ck-prog b { font-family: var(--mono); font-size: 9.5px; letter-spacing: .6px; color: var(--muted); }
+.ck-bar { height: 7px; background: rgba(165,180,200,.12); border-radius: 4px; overflow: hidden; margin-top: 5px; }
+.ck-bar i { display: block; height: 100%; background: var(--green); transition: width .3s ease; }
+.ck-num { font-family: var(--mono); font-size: 9.5px; color: var(--faint); }
+.ck-area { font-family: var(--mono); font-size: 9px; letter-spacing: .6px; color: var(--gold); }
+.p-critica { color: var(--red); } .p-alta { color: var(--amber); } .p-media { color: var(--text); }
+.e-pendiente  { color: var(--faint); } .e-solicitado { color: var(--amber); }
+.e-recibido   { color: var(--text); }  .e-validado   { color: var(--green); }
+table.pipe td select.ck-est { background: var(--panel-2); border: 1px solid var(--line);
+  color: inherit; font-family: var(--mono); font-size: 9px; letter-spacing: .6px;
+  padding: 4px 6px; border-radius: 2px; }
 /* ── FORMULARIOS ──────────────────────────────────────────────────────── */
 .frm { border: 1px solid var(--line); background: var(--panel-2); padding: 17px 18px; margin-top: 18px; }
 .frm h4 { font-family: var(--mono); font-size: 9px; font-weight: 700; letter-spacing: 1.3px;

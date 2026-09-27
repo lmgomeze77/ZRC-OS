@@ -22,6 +22,7 @@ const state = {
   rows: [], flags: [], pend: [], dims: [], bands: [],
   docs: [], econ: [], strat: [], outreach: [], mand: [], drError: null,
   rubrics: [], gates: [], risk: [], doctError: null,
+  miembros: [], accesos: [],
   drTab: 'documentos',
   selected: null, fVert: '', fBand: '', sortKey: 'score', sortDir: -1,
   draft: null
@@ -73,6 +74,19 @@ async function loadAll() {
     sb.from('scoring_bands').select('*').eq('model_id', MODEL_ID).order('minimo', { ascending: false })
   ]);
   for (const r of [scores, flags, pend, dims, bands]) if (r.error) throw r.error;
+
+  // Reserva por expediente: opcional, como los demas tramos. Las politicas
+  // devuelven poco a quien no es admin, y eso es correcto, no un error.
+  try {
+    const [mem, acc] = await Promise.all([
+      sb.from('app_members').select('user_id,nombre,rol'),
+      sb.from('opportunity_access').select('*')
+    ]);
+    const fallo = [mem, acc].find(r => r.error);
+    if (fallo) throw fallo.error;
+    state.miembros = mem.data ?? [];
+    state.accesos = acc.data ?? [];
+  } catch { state.miembros = []; state.accesos = []; }
   state.rows  = scores.data ?? [];
   state.flags = flags.data ?? [];
   state.pend  = pend.data ?? [];
@@ -268,7 +282,8 @@ function renderPipe() {
       <div class="td-code">${esc(r.codigo ?? '— sin código —')}${r.plaza ? ' · ' + esc(r.plaza) : ''}</div></td>
       <td><span class="td-vert">${esc(r.vertical)}</span></td>
       <td><div class="score-cell">${score}</div></td>
-      <td><span class="pill pill-${esc(r.banda ?? 'NONE')}">${esc(r.banda ?? 'NONE')}</span></td>
+      <td><span class="pill pill-${esc(r.banda ?? 'NONE')}">${esc(r.banda ?? 'NONE')}</span>
+        ${r.reservado ? '<span class="pill pill-RESERVADO" style="margin-left:6px">⛔ RESERVADO</span>' : ''}</td>
       <td>${scope}</td></tr>`;
   }).join('');
   $('pipeCount').textContent = `${rs.length} DE ${state.rows.length} EXPEDIENTES`;
@@ -334,6 +349,47 @@ function goNoGo(r, vals, sc) {
     <div class="gg-verdict ${vcls}">${veredicto}</div></div>${palHtml}`;
 }
 
+// Reservar un expediente y repartir quien lo ve es potestad del admin: la
+// base lo aplica en opportunity_access, esto solo es el mando.
+function panelReserva(r) {
+  if (state.rol !== 'admin') return '';
+  const conAcceso = state.accesos.filter(a => a.opportunity_id === r.opportunity_id);
+  const otros = state.miembros.filter(m => m.rol !== 'admin');
+  const yaTiene = new Set(conAcceso.map(a => a.user_id));
+  const libres = otros.filter(m => !yaTiene.has(m.user_id));
+
+  const lista = r.reservado
+    ? (conAcceso.length
+        ? `<div class="acc-lista">${conAcceso.map(a => {
+            const m = state.miembros.find(x => x.user_id === a.user_id);
+            return `<div class="acc-fila"><b>${esc(m?.nombre ?? a.user_id)}</b>
+              <span class="rolepill ${esc(m?.rol ?? '')}">${esc(String(m?.rol ?? '').toUpperCase())}</span>
+              <button class="btn-mini" data-revocar="${esc(a.user_id)}">REVOCAR</button></div>`;
+          }).join('')}</div>`
+        : '<div class="pista" style="margin-top:10px">Nadie más que los administradores puede verlo.</div>')
+    : '';
+
+  const conceder = (r.reservado && libres.length)
+    ? `<div class="frm-grid" style="margin-top:12px">
+         <div class="fld"><label for="accQuien">Conceder acceso a</label>
+           <select id="accQuien">${libres.map(m =>
+             `<option value="${esc(m.user_id)}">${esc(m.nombre ?? m.user_id)} · ${esc(m.rol)}</option>`).join('')}</select></div>
+         <div class="fld"><label>&nbsp;</label>
+           <button class="btn-oro" style="margin-top:0" id="accDar">CONCEDER</button></div>
+       </div>` : '';
+
+  return `<div class="reserva">
+    <h4>⛔ Reserva del expediente</h4>
+    <div class="fld check"><input id="resv" type="checkbox" ${r.reservado ? 'checked' : ''} />
+      <label for="resv">Expediente reservado</label></div>
+    <div class="pista">Reservado, solo lo ven los administradores y quien tenga permiso aquí abajo.
+      La reserva alcanza también a sus documentos, economics, estrategia, inversores, puntuaciones
+      y ficheros: lo aplica la base, no esta pantalla.</div>
+    ${lista}${conceder}
+    <div class="frm-msg" id="resvMsg"></div>
+  </div>`;
+}
+
 // ── DETALLE ─────────────────────────────────────────────────────────
 function renderDetail() {
   const r = state.rows.find(x => x.opportunity_id === state.selected);
@@ -389,9 +445,10 @@ function renderDetail() {
     </div>
     <div class="detail-cols">
       <div>${dimHtml}</div>
-      <div>${goNoGo(r, vals, sc)}${scopeHtml}${action}</div>
+      <div>${goNoGo(r, vals, sc)}${scopeHtml}${panelReserva(r)}${action}</div>
     </div>`;
 
+  if (!canWrite()) cablearReserva(r);
   if (canWrite()) {
     for (const el of $('detail').querySelectorAll('input[type=range]')) {
       el.addEventListener('input', () => {
@@ -405,6 +462,25 @@ function renderDetail() {
       });
     }
     $('saveScore')?.addEventListener('click', saveScore);
+  }
+  cablearReserva(r);
+}
+
+function cablearReserva(r) {
+  const id = r.opportunity_id;
+  $('resv')?.addEventListener('change', (ev) => guardar($('resvMsg'), null,
+    () => sb.from('opportunities').update({ reservado: ev.target.checked }).eq('id', id),
+    ev.target.checked ? 'EXPEDIENTE RESERVADO.' : 'EXPEDIENTE ABIERTO A TODOS LOS MIEMBROS.'));
+
+  $('accDar')?.addEventListener('click', (ev) => guardar($('resvMsg'), ev.target,
+    () => sb.from('opportunity_access').insert({
+      opportunity_id: id, user_id: val('accQuien')
+    }), 'ACCESO CONCEDIDO.'));
+
+  for (const b of document.querySelectorAll('[data-revocar]')) {
+    b.addEventListener('click', (ev) => guardar($('resvMsg'), ev.target,
+      () => sb.from('opportunity_access').delete()
+        .eq('opportunity_id', id).eq('user_id', b.dataset.revocar), 'ACCESO REVOCADO.'));
   }
 }
 

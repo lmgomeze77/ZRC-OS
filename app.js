@@ -138,6 +138,7 @@ function renderStats() {
   const p12 = state.rows.filter(r => r.banda === 'P1' || r.banda === 'P2').length;
   const previa = new Set(state.pend.filter(p => p.motivo === 'verificacion_previa').map(p => p.opportunity_id)).size;
   const sinCodigo = state.pend.filter(p => p.motivo === 'sin_codigo').length;
+  const vivos = state.mand.filter(m => m.estado === 'vivo').length;
 
   const tile = (label, value, sub, alert) =>
     `<div class="stat${alert ? ' is-alert' : ''}"><div class="stat-label">${label}</div>
@@ -146,6 +147,8 @@ function renderStats() {
   $('statGrid').innerHTML =
     tile('Expedientes en pipeline', n, `<b>${puntuados}</b> puntuados · <b>${n - puntuados}</b> sin puntuar`) +
     tile('En banda P1–P2', `${p12}<small>/ ${n}</small>`, 'Acción en 48 h y 7 días') +
+    tile('Mandatos vivos', vivos || '—',
+         vivos ? 'Con plazo y economics registrados' : 'Ningún mandato vivo en Capa 3', !vivos) +
     tile('Verificación previa', previa, 'Ámbito o sanciones antes de analizar', previa > 0) +
     tile('Sin código de expediente', `${sinCodigo}<small>/ ${n}</small>`, 'Bloquea el registro formal (§12.3)', sinCodigo > 0) +
     tarjetaRiesgo();
@@ -203,6 +206,9 @@ function tarjetaRiesgo() {
 // ── 2 · PENDIENTES ──────────────────────────────────────────────────
 const MOTIVO = {
   verificacion_previa: ['Verificación previa', 'Resolver el flag antes de consumir tiempo analítico.'],
+  // La banda fija la accion por si sola: no hace falta ningun aviso ni
+  // ninguna carencia para que un P1 exija trabajo hoy.
+  banda_alta:          ['Banda alta', 'La acción y el plazo los fija la banda.'],
   sin_codigo:          ['Sin código de expediente', 'Asignar código con el patrón del manual (§12.3).'],
   sin_puntuar:         ['Sin puntuar', 'Puntuar contra las rúbricas ancladas.']
 };
@@ -213,12 +219,17 @@ function renderQueue() {
   $('queue').innerHTML = items.map((it, i) => {
     const [titulo, accion] = MOTIVO[it.motivo] ?? [it.motivo, ''];
     const stop = it.motivo === 'verificacion_previa';
+    const banda = it.motivo === 'banda_alta'
+      ? (state.rows.find(r => r.opportunity_id === it.opportunity_id)?.banda ?? null) : null;
+    const lado = banda
+      ? `<span class="pill pill-${esc(banda)}">${esc(banda)}</span>`
+      : `<span class="flag ${stop ? 'flag-stop' : 'flag-warn'}">${stop ? '⛔' : '▲'} ${esc(titulo)}</span>`;
     return `<div class="q-item" data-goto="${esc(it.opportunity_id)}" role="button" tabindex="0" style="cursor:pointer">
       <div class="q-rank">${String(i+1).padStart(2,'0')}</div>
       <div><div class="q-title">${esc(it.nombre)}</div>
       <div class="q-why">${esc(it.detalle ?? titulo)}</div>
       <div class="q-act"><b>ACCIÓN</b> · ${esc(accion)}</div></div>
-      <div class="q-side"><span class="flag ${stop ? 'flag-stop' : 'flag-warn'}">${stop ? '⛔' : '▲'} ${esc(titulo)}</span></div>
+      <div class="q-side">${lado}</div>
     </div>`;
   }).join('');
 }

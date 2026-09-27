@@ -20,7 +20,7 @@ const esc = (s) => String(s ?? '').replace(/[&<>"']/g,
 const state = {
   rol: null, email: null,
   rows: [], flags: [], pend: [], dims: [], bands: [],
-  docs: [], econ: [], strat: [], outreach: [], mand: [],
+  docs: [], econ: [], strat: [], outreach: [], mand: [], drError: null,
   drTab: 'documentos',
   selected: null, fVert: '', fBand: '', sortKey: 'score', sortDir: -1,
   draft: null
@@ -63,30 +63,44 @@ async function loadRole() {
 }
 
 async function loadAll() {
-  const [scores, flags, pend, dims, bands, docs, econ, strat, outreach, mand] = await Promise.all([
+  // NUCLEO: sin esto no hay cuadro de mando. Un fallo aqui si es fatal.
+  const [scores, flags, pend, dims, bands] = await Promise.all([
     sb.from('v_opportunity_scores').select('*'),
     sb.from('scope_flags').select('*').is('resuelto_en', null),
     sb.from('v_pendientes').select('*'),
     sb.from('scoring_dimensions').select('*').eq('model_id', MODEL_ID).order('orden'),
-    sb.from('scoring_bands').select('*').eq('model_id', MODEL_ID).order('minimo', { ascending: false }),
-    sb.from('documents').select('*').order('orden'),
-    sb.from('v_economics').select('*'),
-    sb.from('strategy').select('*'),
-    // PostgREST resuelve el inversor por la clave foranea: una consulta, no dos.
-    sb.from('investor_outreach').select('*, investors(nombre,tipo,geo,ticket_min_eur,ticket_max_eur)'),
-    sb.from('mandates').select('*')
+    sb.from('scoring_bands').select('*').eq('model_id', MODEL_ID).order('minimo', { ascending: false })
   ]);
-  for (const r of [scores, flags, pend, dims, bands, docs, econ, strat, outreach, mand]) if (r.error) throw r.error;
+  for (const r of [scores, flags, pend, dims, bands]) if (r.error) throw r.error;
   state.rows  = scores.data ?? [];
   state.flags = flags.data ?? [];
   state.pend  = pend.data ?? [];
   state.dims  = dims.data ?? [];
   state.bands = bands.data ?? [];
-  state.docs = docs.data ?? [];
-  state.econ = econ.data ?? [];
-  state.strat = strat.data ?? [];
-  state.outreach = outreach.data ?? [];
-  state.mand = mand.data ?? [];
+  // DATA ROOM: opcional. Si 06_dataroom.sql no se ha aplicado todavia, sus
+  // tablas no existen — y eso no puede dejar en blanco el cuadro de mando
+  // entero. Se degrada a una seccion que explica que falta.
+  try {
+    const [docs, econ, strat, outreach, mand] = await Promise.all([
+      sb.from('documents').select('*').order('orden'),
+      sb.from('v_economics').select('*'),
+      sb.from('strategy').select('*'),
+      // PostgREST resuelve el inversor por la clave foranea: una consulta, no dos.
+      sb.from('investor_outreach').select('*, investors(nombre,tipo,geo,ticket_min_eur,ticket_max_eur)'),
+      sb.from('mandates').select('*')
+    ]);
+    const fallo = [docs, econ, strat, outreach, mand].find(r => r.error);
+    if (fallo) throw fallo.error;
+    state.docs = docs.data ?? [];
+    state.econ = econ.data ?? [];
+    state.strat = strat.data ?? [];
+    state.outreach = outreach.data ?? [];
+    state.mand = mand.data ?? [];
+    state.drError = null;
+  } catch (err) {
+    state.docs = []; state.econ = []; state.strat = []; state.outreach = []; state.mand = [];
+    state.drError = String(err?.message ?? err);
+  }
   if (state.selected == null && state.rows.length) {
     const best = [...state.rows].sort((a,b) => (b.dealscore ?? -1) - (a.dealscore ?? -1))[0];
     state.selected = best.opportunity_id;
@@ -500,6 +514,17 @@ function renderDataroom() {
   if (!r) { $('drBody').innerHTML = ''; $('drTabs').innerHTML = ''; return; }
   $('drRef').textContent = String(r.nombre).toUpperCase();
 
+  if (state.drError) {
+    $('drTabs').innerHTML = '';
+    const falta = /schema cache|does not exist|relation/i.test(state.drError);
+    $('drBody').innerHTML = `<div class="banner"><b>DATA ROOM NO DISPONIBLE</b><br>${
+      falta
+        ? 'Sus tablas todavía no existen en la base. Aplica <code>supabase/06_dataroom.sql</code> en el SQL Editor de Supabase y recarga.'
+        : esc(state.drError)
+    }</div>`;
+    return;
+  }
+
   const n = {
     documentos: state.docs.filter(d => d.opportunity_id === r.opportunity_id).length,
     economics:  state.econ.some(e => e.opportunity_id === r.opportunity_id) ? 1 : 0,
@@ -672,6 +697,7 @@ async function boot() {
   try {
     await loadAll();
     if (!state.rows.length) banner('<b>SIN DATOS</b><br>La base responde pero no devuelve expedientes. Revisa que se haya aplicado la carga (05_seed.sql).');
+    else if (state.drError) banner('<b>DATA ROOM NO DISPONIBLE</b><br>El resto del cuadro de mando funciona. Para activarlo, aplica <code>supabase/06_dataroom.sql</code> en el SQL Editor y recarga.');
     renderAll();
   } catch (err) {
     banner('<b>ERROR AL CARGAR</b><br>' + esc(String(err.message)));

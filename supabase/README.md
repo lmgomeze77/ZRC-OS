@@ -81,3 +81,30 @@ El esquema se aplicó y se probó sobre PostgreSQL 16 con un rol equivalente al
 - `writer`: `UPDATE 1`; no puede ascenderse a `admin`
 - No miembro: cero filas
 - Cálculo contrastado contra un caso conocido del cuadro de mando
+
+## Decisión: proyecto Supabase compartido
+
+ZRC OS convive con la plataforma ZRC en el mismo proyecto y en el esquema
+`public`. Decisión consciente, tomada para avanzar.
+
+**Riesgo asumido**: los nombres de tabla son territorio común. Si la otra
+aplicación crea una tabla llamada `companies`, `contacts`, `mandates`,
+`theses`, `decisions` u `outcomes`, chocará con las de aquí — o al revés.
+Como `01_schema.sql` usa `create table if not exists`, un choque no da error:
+la tabla existente se conserva, pero recibe RLS y las políticas de ZRC OS, y
+la aplicación que la usaba deja de ver sus filas sin ningún mensaje.
+
+El bloque de RLS lleva la lista de tablas escrita a mano, así que nunca toca
+tablas ajenas a esa lista.
+
+**Detección**: hay seis tablas en las que la carga de ZRC OS no inserta nada
+(`companies`, `contacts`, `mandates`, `theses`, `decisions`, `outcomes`). Si
+alguna tiene filas, ya existía. La consulta de comprobación compara filas
+esperadas contra reales por tabla.
+
+**Salida si ocurre**: quitar las cuatro políticas de esa tabla y devolver RLS
+a su estado anterior. No hay que tocar los datos.
+
+**Arreglo de fondo, pendiente**: mover ZRC OS a un esquema propio (`zrcos`),
+dentro de este mismo proyecto. Elimina la clase entera de problema y conserva
+una sola identidad para todo ZRC.

@@ -20,6 +20,8 @@ const esc = (s) => String(s ?? '').replace(/[&<>"']/g,
 const state = {
   rol: null, email: null,
   rows: [], flags: [], pend: [], dims: [], bands: [],
+  docs: [], econ: [], strat: [], outreach: [], mand: [],
+  drTab: 'documentos',
   selected: null, fVert: '', fBand: '', sortKey: 'score', sortDir: -1,
   draft: null
 };
@@ -61,19 +63,30 @@ async function loadRole() {
 }
 
 async function loadAll() {
-  const [scores, flags, pend, dims, bands] = await Promise.all([
+  const [scores, flags, pend, dims, bands, docs, econ, strat, outreach, mand] = await Promise.all([
     sb.from('v_opportunity_scores').select('*'),
     sb.from('scope_flags').select('*').is('resuelto_en', null),
     sb.from('v_pendientes').select('*'),
     sb.from('scoring_dimensions').select('*').eq('model_id', MODEL_ID).order('orden'),
-    sb.from('scoring_bands').select('*').eq('model_id', MODEL_ID).order('minimo', { ascending: false })
+    sb.from('scoring_bands').select('*').eq('model_id', MODEL_ID).order('minimo', { ascending: false }),
+    sb.from('documents').select('*').order('orden'),
+    sb.from('v_economics').select('*'),
+    sb.from('strategy').select('*'),
+    // PostgREST resuelve el inversor por la clave foranea: una consulta, no dos.
+    sb.from('investor_outreach').select('*, investors(nombre,tipo,geo,ticket_min_eur,ticket_max_eur)'),
+    sb.from('mandates').select('*')
   ]);
-  for (const r of [scores, flags, pend, dims, bands]) if (r.error) throw r.error;
+  for (const r of [scores, flags, pend, dims, bands, docs, econ, strat, outreach, mand]) if (r.error) throw r.error;
   state.rows  = scores.data ?? [];
   state.flags = flags.data ?? [];
   state.pend  = pend.data ?? [];
   state.dims  = dims.data ?? [];
   state.bands = bands.data ?? [];
+  state.docs = docs.data ?? [];
+  state.econ = econ.data ?? [];
+  state.strat = strat.data ?? [];
+  state.outreach = outreach.data ?? [];
+  state.mand = mand.data ?? [];
   if (state.selected == null && state.rows.length) {
     const best = [...state.rows].sort((a,b) => (b.dealscore ?? -1) - (a.dealscore ?? -1))[0];
     state.selected = best.opportunity_id;
@@ -259,6 +272,120 @@ async function saveScore() {
   }
 }
 
+
+// ── 4 · DATA ROOM ───────────────────────────────────────────────────
+const CATS = {
+  registral:'Registral', catastral:'Catastral', tecnico:'Técnico',
+  licencias:'Licencias', legal:'Legal', fiscal:'Fiscal',
+  comunidad:'Comunidad', comercial:'Comercial', financiero:'Financiero', otros:'Otros'
+};
+const EST_INV = {
+  identificado:'Identificado', contactado:'Contactado', nda:'NDA firmado',
+  en_revision:'En revisión', interesado:'Interesado', oferta:'Oferta', descartado:'Descartado'
+};
+const eur = (n) => n == null ? null
+  : new Intl.NumberFormat('es-ES', { style:'currency', currency:'EUR', maximumFractionDigits:0 }).format(n);
+
+const vacio = (txt) => `<div class="empty-state">${esc(txt)}</div>`;
+
+function drDocumentos(id) {
+  const ds = state.docs.filter(d => d.opportunity_id === id);
+  if (!ds.length) return vacio('Sin documentación cargada para este expediente.');
+  const cats = [...new Set(ds.map(d => d.categoria))];
+  return cats.map(c => {
+    const items = ds.filter(d => d.categoria === c);
+    return `<div class="dr-cat">${esc(CATS[c] ?? c)} · ${items.length}</div>
+      <div class="dr-grid">${items.map(d => `
+        <article class="doc">
+          <div><h4>${esc(d.titulo)}</h4>${d.descripcion ? `<p>${esc(d.descripcion)}</p>` : ''}</div>
+          ${d.url
+            ? `<a href="${esc(d.url)}" target="_blank" rel="noopener">ABRIR DOCUMENTO</a>`
+            : `<div class="pend">▲ ${esc(String(d.estado).toUpperCase())}</div>`}
+        </article>`).join('')}</div>`;
+  }).join('');
+}
+
+function drEconomics(id) {
+  const e = state.econ.find(x => x.opportunity_id === id);
+  const m = state.mand.filter(x => x.opportunity_id === id && x.estado === 'vivo')[0];
+  if (!e && !m) return vacio('Sin economics ni mandato registrados todavía.');
+  const fila = (k, v) => `<dt>${k}</dt><dd${v == null ? ' class="vacio"' : ''}>${v ?? 'sin registrar'}</dd>`;
+  const rango = e && (e.ev_min_eur != null || e.ev_max_eur != null)
+    ? `${eur(e.ev_min_eur) ?? '—'} – ${eur(e.ev_max_eur) ?? '—'}` : null;
+  // El precio ya viene oculto de la vista si no esta autorizada su difusion.
+  const precio = !e ? null
+    : (e.precio_objetivo_eur != null ? eur(e.precio_objetivo_eur)
+      : '<span class="oculto">⛔ NO DIVULGADO EN ESTA FASE</span>');
+  return `<dl class="kv">
+    ${fila('Rango de EV', rango)}
+    ${fila('Precio objetivo', precio)}
+    ${fila('Retainer', e ? eur(e.retainer_eur) : null)}
+    ${fila('Éxito', e && e.exito_pct != null ? e.exito_pct + ' %' : null)}
+    ${fila('Éxito mínimo', e ? eur(e.exito_min_eur) : null)}
+    ${fila('Exclusividad', e && e.exclusividad != null ? (e.exclusividad ? 'Sí' : 'No') : null)}
+    ${fila('Duración', e && e.duracion_meses != null ? e.duracion_meses + ' meses' : null)}
+    ${fila('Mandato', m ? `${esc(m.tipo ?? 'vivo')}${m.vence_en ? ' · vence ' + esc(m.vence_en) : ''}` : null)}
+  </dl>${e && e.notas ? `<div class="prosa" style="margin-top:14px"><h4>Notas</h4><p>${esc(e.notas)}</p></div>` : ''}`;
+}
+
+function drEstrategia(id) {
+  const s = state.strat.find(x => x.opportunity_id === id);
+  if (!s) return vacio('Sin estrategia registrada para este expediente.');
+  const bloque = (t, v) => v ? `<div class="prosa"><h4>${t}</h4><p>${esc(v)}</p></div>` : '';
+  const html = bloque('Ángulo · por qué ZRC', s.angulo) + bloque('Comprador objetivo', s.comprador_tipo)
+             + bloque('Proceso', s.proceso) + bloque('Riesgos', s.riesgos);
+  return html || vacio('La estrategia existe pero está vacía.');
+}
+
+function drInversores(id) {
+  const os = state.outreach.filter(x => x.opportunity_id === id)
+    .sort((a, b) => (a.prioridad ?? 99) - (b.prioridad ?? 99));
+  if (!os.length) return vacio('Sin inversores potenciales asociados todavía.');
+  return `<div class="table-scroll"><table class="pipe"><thead><tr>
+      <th>Inversor</th><th>Tipo</th><th>Ticket</th><th>Estado</th><th>Último contacto</th>
+    </tr></thead><tbody>${os.map(o => {
+      const i = o.investors ?? {};
+      const tk = (i.ticket_min_eur != null || i.ticket_max_eur != null)
+        ? `${eur(i.ticket_min_eur) ?? '—'} – ${eur(i.ticket_max_eur) ?? '—'}` : '—';
+      return `<tr><td><div class="td-name">${esc(i.nombre ?? '—')}</div>
+        ${i.geo ? `<div class="td-code">${esc(i.geo)}</div>` : ''}</td>
+        <td><span class="td-vert">${esc(i.tipo ?? '—')}</span></td>
+        <td><span class="td-code">${tk}</span></td>
+        <td><span class="pill ${o.estado === 'descartado' ? 'pill-DESCARTE' : 'pill-P2'}">${esc(EST_INV[o.estado] ?? o.estado)}</span></td>
+        <td><span class="td-code">${esc(o.ultimo_contacto ?? '—')}</span></td></tr>`;
+    }).join('')}</tbody></table></div>`;
+}
+
+const DR_TABS = [
+  ['documentos', 'DOCUMENTACIÓN', drDocumentos],
+  ['economics',  'ECONOMICS · MANDATO', drEconomics],
+  ['estrategia', 'ESTRATEGIA', drEstrategia],
+  ['inversores', 'INVERSORES', drInversores]
+];
+
+function renderDataroom() {
+  const r = state.rows.find(x => x.opportunity_id === state.selected);
+  if (!r) { $('drBody').innerHTML = ''; $('drTabs').innerHTML = ''; return; }
+  $('drRef').textContent = String(r.nombre).toUpperCase();
+
+  const n = {
+    documentos: state.docs.filter(d => d.opportunity_id === r.opportunity_id).length,
+    economics:  state.econ.some(e => e.opportunity_id === r.opportunity_id) ? 1 : 0,
+    estrategia: state.strat.some(e => e.opportunity_id === r.opportunity_id) ? 1 : 0,
+    inversores: state.outreach.filter(o => o.opportunity_id === r.opportunity_id).length
+  };
+
+  $('drTabs').innerHTML = DR_TABS.map(([k, label]) =>
+    `<button class="tbtn" data-tab="${k}" aria-pressed="${state.drTab === k}">
+       ${label}${n[k] ? ` · ${n[k]}` : ''}</button>`).join('');
+  for (const b of $('drTabs').querySelectorAll('button')) {
+    b.addEventListener('click', () => { state.drTab = b.dataset.tab; renderDataroom(); });
+  }
+
+  const fn = (DR_TABS.find(([k]) => k === state.drTab) ?? DR_TABS[0])[2];
+  $('drBody').innerHTML = fn(r.opportunity_id);
+}
+
 // ── RENDER ──────────────────────────────────────────────────────────
 function renderWhoami() {
   $('whoami').innerHTML =
@@ -275,9 +402,9 @@ function renderFilters() {
   sel.value = state.fVert;
 }
 
-function renderAll() { renderStats(); renderQueue(); renderFilters(); renderPipe(); renderDetail(); }
+function renderAll() { renderStats(); renderQueue(); renderFilters(); renderPipe(); renderDetail(); renderDataroom(); }
 
-function select(id) { state.selected = id; state.draft = null; renderPipe(); renderDetail(); $('detail').scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }
+function select(id) { state.selected = id; state.draft = null; renderPipe(); renderDetail(); renderDataroom(); $('detail').scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }
 
 function wire() {
   $('pipeBody').addEventListener('click', e => { const tr = e.target.closest('tr[data-id]'); if (tr) select(tr.dataset.id); });

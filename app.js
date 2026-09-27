@@ -21,6 +21,7 @@ const state = {
   rol: null, email: null,
   rows: [], flags: [], pend: [], dims: [], bands: [],
   docs: [], econ: [], strat: [], outreach: [], mand: [], drError: null,
+  rubrics: [], gates: [], risk: [], doctError: null,
   drTab: 'documentos',
   selected: null, fVert: '', fBand: '', sortKey: 'score', sortDir: -1,
   draft: null
@@ -77,6 +78,26 @@ async function loadAll() {
   state.pend  = pend.data ?? [];
   state.dims  = dims.data ?? [];
   state.bands = bands.data ?? [];
+  // DOCTRINA: opcional, igual que el data room. Si 09_doctrina.sql no se
+  // ha aplicado, el cuadro de mando sigue funcionando sin rubricas, sin
+  // matriz GO/NO-GO y sin indice de riesgo.
+  try {
+    const [rub, gat, rsk] = await Promise.all([
+      sb.from('scoring_rubrics').select('*').eq('model_id', MODEL_ID),
+      sb.from('scoring_gates').select('*').eq('model_id', MODEL_ID).order('orden'),
+      sb.from('risk_index').select('*').order('fecha')
+    ]);
+    const fallo = [rub, gat, rsk].find(r => r.error);
+    if (fallo) throw fallo.error;
+    state.rubrics = rub.data ?? [];
+    state.gates = gat.data ?? [];
+    state.risk = rsk.data ?? [];
+    state.doctError = null;
+  } catch (err) {
+    state.rubrics = []; state.gates = []; state.risk = [];
+    state.doctError = String(err?.message ?? err);
+  }
+
   // DATA ROOM: opcional. Si 06_dataroom.sql no se ha aplicado todavia, sus
   // tablas no existen — y eso no puede dejar en blanco el cuadro de mando
   // entero. Se degrada a una seccion que explica que falta.
@@ -126,7 +147,57 @@ function renderStats() {
     tile('Expedientes en pipeline', n, `<b>${puntuados}</b> puntuados · <b>${n - puntuados}</b> sin puntuar`) +
     tile('En banda P1–P2', `${p12}<small>/ ${n}</small>`, 'Acción en 48 h y 7 días') +
     tile('Verificación previa', previa, 'Ámbito o sanciones antes de analizar', previa > 0) +
-    tile('Sin código de expediente', `${sinCodigo}<small>/ ${n}</small>`, 'Bloquea el registro formal (§12.3)', sinCodigo > 0);
+    tile('Sin código de expediente', `${sinCodigo}<small>/ ${n}</small>`, 'Bloquea el registro formal (§12.3)', sinCodigo > 0) +
+    tarjetaRiesgo();
+}
+
+// El punto hueco marca un valor reconstruido por interpolacion: no es una
+// lectura, y dibujarlo igual que una lectura seria afirmar algo que no consta.
+function sparkline(serie) {
+  const W = 200, H = 42, PT = 6, PB = 6, PL = 2, PR = 6;
+  if (serie.length < 2) return '';
+  const vals = serie.map(r => r.valor);
+  const lo = Math.min(...vals) - 3, hi = Math.max(...vals) + 3;
+  const x = i => PL + i * (W - PL - PR) / (serie.length - 1);
+  const y = v => PT + (hi - v) * (H - PT - PB) / (hi - lo);
+  const d = serie.map((r, i) => (i ? 'L' : 'M') + x(i).toFixed(1) + ' ' + y(r.valor).toFixed(1)).join(' ');
+  const area = d + ` L${x(serie.length - 1).toFixed(1)} ${H} L${x(0).toFixed(1)} ${H} Z`;
+  const dots = serie.map((r, i) => {
+    const last = i === serie.length - 1;
+    if (r.estado === 'publicado' && !last) return '';
+    const cx = x(i).toFixed(1), cy = y(r.valor).toFixed(1);
+    if (last) return `<circle cx="${cx}" cy="${cy}" r="3" fill="#C9A84C" stroke="#0B1526" stroke-width="1.5"></circle>`;
+    return `<circle cx="${cx}" cy="${cy}" r="2.4" fill="#0B1526" stroke="${
+      r.estado === 'reconstruido' ? '#5A6A80' : '#FBBF24'}" stroke-width="1.2"></circle>`;
+  }).join('');
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" height="${H}" role="img"
+    aria-label="Índice de riesgo ZRC, ${serie.length} días, de ${vals[0]} a ${vals[vals.length-1]}"
+    preserveAspectRatio="none" style="display:block;max-width:100%">
+    <defs><linearGradient id="sparkG" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#C9A84C" stop-opacity=".22"></stop>
+      <stop offset="100%" stop-color="#C9A84C" stop-opacity="0"></stop>
+    </linearGradient></defs>
+    <path d="${area}" fill="url(#sparkG)"></path>
+    <path d="${d}" fill="none" stroke="#C9A84C" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"></path>
+    ${dots}</svg>`;
+}
+
+function tarjetaRiesgo() {
+  if (!state.risk.length) return '';
+  const ult = state.risk[state.risk.length - 1];
+  const prev = state.risk[state.risk.length - 2];
+  const delta = prev ? ult.valor - prev.valor : 0;
+  const flecha = delta === 0 ? '→' : (delta > 0 ? '▲' : '▼');
+  const dias = Math.round((Date.now() - new Date(ult.fecha).getTime()) / 86400000);
+  return `<div class="stat"><div class="stat-label">Índice de riesgo ZRC</div>
+    <div class="stat-value">${ult.valor}<small>${flecha} ${Math.abs(delta)}</small></div>
+    <div class="spark-wrap">${sparkline(state.risk)}</div>
+    <div class="spark-legend">
+      <span><i style="background:#C9A84C"></i>Publicado</span>
+      <span><i style="border:1.2px solid #FBBF24"></i>Degradado</span>
+      <span><i style="border:1.2px solid #5A6A80"></i>Reconstruido</span>
+    </div>
+    <div class="stat-sub">${esc(ult.fecha)}${dias > 2 ? ` · <b style="color:var(--amber)">${dias} días sin actualizar</b>` : ''}</div></div>`;
 }
 
 // ── 2 · PENDIENTES ──────────────────────────────────────────────────
@@ -193,25 +264,92 @@ function renderPipe() {
   $('pipeRef').textContent = `${state.rows.length} EXPEDIENTES · ${MODEL_ID.toUpperCase()}`;
 }
 
+// Las palancas no son las dimensiones con peor nota, sino aquellas donde
+// queda mas recorrido ponderado: (10 - valor) x peso. Es la diferencia
+// entre «esto esta flojo» y «aqui es donde hay puntos que ganar».
+function levers(vals, n) {
+  if (!vals) return [];
+  return vals.map((x, i) => ({ i, gana: (10 - x) * Number(state.dims[i]?.peso ?? 0) }))
+    .sort((a, b) => b.gana - a.gana).slice(0, n).map(o => o.i);
+}
+
+// Matriz GO / NO-GO (Anexo B). Las puertas vienen de la base: cambiar un
+// umbral es una decision registrada, no un despliegue.
+function goNoGo(r, vals, sc) {
+  if (!state.gates.length) return '';
+  const fs = flagsOf(r.opportunity_id);
+  const hayStop = fs.some(f => f.nivel === 'stop');
+  const idx = (cod) => state.dims.findIndex(d => d.codigo === cod);
+
+  const checks = state.gates.map(g => {
+    let ok = null;
+    if (g.tipo === 'knockout') ok = !hayStop;
+    else if (g.tipo === 'ambito') ok = (r.geo === 'ES' || r.geo === 'PT') ? true : (r.geo === 'MENA' ? null : false);
+    else if (g.tipo === 'dealscore') ok = sc == null ? null : sc >= Number(g.umbral);
+    else if (g.tipo === 'dimension') {
+      const i = idx(g.codigo);
+      ok = (vals && i >= 0) ? vals[i] >= Number(g.umbral) : null;
+    }
+    return { ...g, ok };
+  });
+
+  const fallaElim = checks.some(c => c.eliminatoria && c.ok === false);
+  const pendiente = checks.some(c => c.ok === null);
+  const fallaBlanda = checks.some(c => !c.eliminatoria && c.ok === false);
+
+  let veredicto, vcls;
+  if (fallaElim)        { veredicto = 'NO-GO AUTOMÁTICO'; vcls = 'no'; }
+  else if (pendiente)   { veredicto = 'INFORMACIÓN INSUFICIENTE'; vcls = 'cio'; }
+  else if (fallaBlanda) { veredicto = 'DECISIÓN DEL CIO · EXCEPCIÓN DOCUMENTADA'; vcls = 'cio'; }
+  else                  { veredicto = 'GO'; vcls = 'go'; }
+
+  const filas = checks.map(c => {
+    const cls = c.ok === true ? 'gg-pass' : (c.ok === false ? 'gg-fail' : 'gg-warn');
+    const mk  = c.ok === true ? '✓' : (c.ok === false ? '✕' : '?');
+    return `<div class="gg-item ${cls}"><span class="gg-mark">${mk}</span>
+      <span class="gg-q">${esc(c.pregunta)}</span><span class="gg-t">${esc(c.etiqueta)}</span></div>`;
+  }).join('');
+
+  const pal = levers(vals, 2);
+  const palHtml = (vals && pal.length === 2)
+    ? `<div class="lever"><h4>◆ LECTURA OPERATIVA</h4><p>La puntuación no dice qué hacer; dice dónde
+       está el problema. Las dos palancas de este expediente son
+       <b style="color:var(--cream)">${esc(state.dims[pal[0]].codigo)} · ${esc(state.dims[pal[0]].nombre)}</b> y
+       <b style="color:var(--cream)">${esc(state.dims[pal[1]].codigo)} · ${esc(state.dims[pal[1]].nombre)}</b>.
+       Mover cualquiera de las dos cambia la banda más que cualquier trabajo adicional sobre las seis restantes.</p></div>`
+    : '';
+
+  return `<div class="gonogo"><h4>Matriz GO / NO-GO · Anexo B</h4>${filas}
+    <div class="gg-verdict ${vcls}">${veredicto}</div></div>${palHtml}`;
+}
+
 // ── DETALLE ─────────────────────────────────────────────────────────
 function renderDetail() {
   const r = state.rows.find(x => x.opportunity_id === state.selected);
   if (!r) { $('detail').innerHTML = ''; return; }
   const vals = state.draft && state.draft.id === r.opportunity_id ? state.draft.v : null;
 
+  const palancas = levers(vals, 2);
   const dimHtml = state.dims.map((d, i) => {
     const v = vals ? vals[i] : null;
+    // tramo 0..4 -> 0-2, 3-4, 5-6, 7-8, 9-10
+    const tramo = v == null ? null : Math.min(4, Math.floor(v / 2.0001));
+    const rub = tramo == null ? null
+      : state.rubrics.find(r => r.codigo === d.codigo && r.tramo === tramo);
+    const esPalanca = palancas.includes(i) && vals;
     const control = canWrite()
       ? `<input class="dim-slider" type="range" min="0" max="10" step="1"
            value="${v ?? 5}" data-dim="${i}" aria-label="${esc(d.codigo + ' ' + d.nombre)}" />`
       : '';
-    return `<div class="dim-row"><div class="dim-top">
+    return `<div class="dim-row${esPalanca ? ' is-lever' : ''}"><div class="dim-top">
         <span class="dim-code">${esc(d.codigo)}</span>
         <span class="dim-name">${esc(d.nombre)}${d.invertida ? ' <span class="dim-w">(invertida)</span>' : ''}</span>
+        ${esPalanca ? '<span class="lever-tag">PALANCA</span>' : ''}
         <span class="dim-w">${d.peso}%</span>
         <span class="dim-val">${v ?? '—'}</span></div>
         <div class="dim-bar-row"><span class="dim-track"><span class="dim-fill" style="width:${(v ?? 0) * 10}%"></span></span></div>
-        ${control}</div>`;
+        ${control}
+        ${rub ? `<div class="dim-anchor">${esc(rub.texto)}</div>` : ''}</div>`;
   }).join('');
 
   const sc = vals ? Math.round(vals.reduce((t, x, i) => t + x * Number(state.dims[i].peso), 0)) / 10 : r.dealscore;
@@ -240,7 +378,7 @@ function renderDetail() {
     </div>
     <div class="detail-cols">
       <div>${dimHtml}</div>
-      <div>${scopeHtml}${action}</div>
+      <div>${goNoGo(r, vals, sc)}${scopeHtml}${action}</div>
     </div>`;
 
   if (canWrite()) {
@@ -635,7 +773,68 @@ function renderFilters() {
   sel.value = state.fVert;
 }
 
-function renderAll() { renderStats(); renderQueue(); renderFilters(); renderPipe(); renderDetail(); renderDataroom(); }
+function renderCalibracion() {
+  const cuenta = { P1:0, P2:0, P3:0, P4:0, DESCARTE:0, NONE:0 };
+  for (const r of state.rows) cuenta[r.banda ?? 'NONE']++;
+  const orden = [['P1','var(--b1)'],['P2','var(--b2)'],['P3','var(--b3)'],
+                 ['P4','var(--b4)'],['DESCARTE','var(--b5)'],['NONE','rgba(52,65,86,.8)']];
+  const max = Math.max(...orden.map(([k]) => cuenta[k])) || 1;
+
+  const conDesenlace = 0;  // outcomes aun vacia
+  const dist = orden.map(([k, c]) =>
+    `<div class="bandrow"><span class="bl" style="color:${c}">${k === 'NONE' ? 'SIN PUNT.' : k}</span>
+     <span class="bt"><span class="bf" style="width:${cuenta[k] / max * 100}%;background:${c}"></span></span>
+     <span class="bn">${cuenta[k]} exp.</span></div>`).join('');
+
+  $('calGrid').innerHTML = `
+    <div class="card"><h3>Distribución por banda</h3>
+      <p class="card-note">Reparto del pipeline actual. Una distribución plana indica rúbricas mal
+      ancladas, no un pipeline bueno.</p>${dist}</div>
+
+    <div class="card"><h3>Conversión por banda</h3>
+      <p class="card-note">Si P1+P2 no convierten claramente por encima de P3+P4, el score no separa.</p>
+      <div class="empty-state">Sin datos. Ningún expediente tiene desenlace registrado
+        (<span class="num">${conDesenlace}</span> de <span class="num">${state.rows.length}</span>).<br />
+        <b style="color:var(--text);font-style:normal">Esta tarjeta no puede rellenarse desde el análisis:
+        exige el desenlace real de operaciones cerradas y abortadas.</b></div></div>
+
+    <div class="card"><h3>Muestra para recalibrar</h3>
+      <p class="card-note">Expedientes con desenlace conocido frente al mínimo accionable.</p>
+      <div class="gauge-track"><span class="gauge-fill" style="width:${Math.min(100, conDesenlace / 20 * 100)}%"></span></div>
+      <div class="gauge-ticks"><span>0 ACTUAL</span><span>10 ORIENTATIVO</span><span>20 ACCIONABLE</span></div>
+      <p class="empty-state" style="padding-bottom:0">Por debajo de 10, los resultados son orientativos.
+        Incluye siempre los que salieron mal y los que descartaste: un backtest hecho solo con éxitos
+        es sesgo de supervivencia.</p></div>
+
+    <div class="card"><h3>Poder discriminante</h3>
+      <p class="card-note">Cuánto separa cada dimensión los expedientes que cerraron de los que no.</p>
+      <div class="empty-state">Sin datos. Se calcula como la diferencia entre la media de la dimensión
+        en cerrados y en no cerrados; una dimensión con discriminación cercana a cero no aporta
+        información, por mucho peso que se le haya dado.<br /><br />
+        <b style="color:var(--text);font-style:normal">Primer contraste esperado:</b> el manual asigna a
+        <i>Acceso al decisor</i> el mayor peso por su correlación empírica con el cierre. Es la primera
+        hipótesis que el backtest debe confirmar o refutar.</div></div>`;
+}
+
+function renderArquitectura() {
+  const puntuados = state.rows.filter(r => r.dealscore != null).length;
+  const capas = [
+    ['CAPA 1','Doctrina','Manual del Intelligence Officer: epistemología, rúbricas, playbooks, gobernanza. No es código; es lo que el código tiene que respetar.',
+      state.rubrics.length ? ['ok', `✓ ${state.rubrics.length} RÚBRICAS EN BASE`] : ['warn','▲ SIN CARGAR']],
+    ['CAPA 2','Señal','ZRC Morning Intelligence: barrido de fuentes, 9 mesas, índice de riesgo.',
+      state.risk.length ? ['ok', `✓ ${state.risk.length} DÍAS DE SERIE`] : ['warn','▲ SIN CARGAR']],
+    ['CAPA 3','Memoria','Postgres/Supabase: expedientes, mandatos, puntuaciones, data room y desenlaces, con RLS.',
+      state.rows.length ? ['ok', `✓ ${state.rows.length} EXPEDIENTES`] : ['warn','▲ VACÍA']],
+    ['CAPA 4','Mando','Esta superficie. Ya no lee de un fichero estático: consulta v_opportunity_scores, v_pendientes y v_dataroom en vivo.',
+      puntuados ? ['ok', `✓ ${puntuados} PUNTUADOS`] : ['warn','▲ NADA PUNTUADO']]
+  ];
+  $('layers').innerHTML = capas.map(([n, nom, desc, [cls, txt]]) =>
+    `<div class="layer"><span class="layer-n">${n}</span><span class="layer-name">${nom}</span>
+     <span class="layer-desc">${esc(desc)}</span>
+     <span class="flag flag-${cls}">${esc(txt)}</span></div>`).join('');
+}
+
+function renderAll() { renderStats(); renderQueue(); renderFilters(); renderPipe(); renderDetail(); renderDataroom(); renderCalibracion(); renderArquitectura(); }
 
 function select(id) { state.selected = id; state.draft = null; renderPipe(); renderDetail(); renderDataroom(); $('detail').scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }
 

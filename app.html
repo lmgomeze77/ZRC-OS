@@ -549,8 +549,25 @@ table.pipe td { padding: 11px 12px; vertical-align: middle; font-size: 13.5px; }
       <a href="#pendientes">02 &middot; PENDIENTES</a>
       <a href="#pipeline">03 &middot; PIPELINE DEALSCORE</a>
       <a href="#dataroom">04 &middot; DATA ROOM</a>
+      <a href="#calibracion">05 &middot; CALIBRACI&Oacute;N</a>
+      <a href="#arquitectura">06 &middot; ARQUITECTURA</a>
     </nav>
   </header>
+
+  <!-- Decision de gobernanza heredada del prototipo. Es doctrina, no dato:
+       se queda en la pagina hasta que el CIO unifique los dos modelos. -->
+  <div class="govern" role="note">
+    <div class="govern-head">&#9650; DECISI&Oacute;N PENDIENTE DEL CIO &middot; MODELO DE SCORING</div>
+    <p>El corpus contiene <b>dos sistemas de puntuaci&oacute;n incompatibles que comparten los mismos
+      nombres de columna</b> <code>D1&hellip;D8</code>. En el manual del Intelligence Officer (ZOS, &sect;5.2)
+      <code>D3</code> es <i>Acceso al decisor</i> con peso 18&nbsp;%. En el esquema de Capa&nbsp;3 y en el
+      libro de backtest (DEALSCORE, ZRC-DOC-INT-001 &sect;5.2) <code>D3</code> es <i>Probabilidad de cierre</i>
+      con peso 15&nbsp;%, y <i>Acceso al decisor</i> es <code>D2</code>. Las bandas tambi&eacute;n difieren:
+      85/70/55/40/20 frente a 80/65/50/35.</p>
+    <p>Capa&nbsp;3 guarda cada puntuaci&oacute;n <b>junto al modelo con el que se hizo</b>, de modo que una
+      cifra vieja sigue siendo legible bajo su modelo. Lo que sigue pendiente es la decisi&oacute;n de
+      cu&aacute;l rige: mientras convivan, cargar un hist&oacute;rico exige declarar su modelo.</p>
+  </div>
 
   <div id="banner"></div>
 
@@ -608,6 +625,22 @@ table.pipe td { padding: 11px 12px; vertical-align: middle; font-size: 13.5px; }
     </p>
     <div class="dr-tabs" id="drTabs"></div>
     <div id="drBody"></div>
+  </section>
+
+  <section class="section" id="calibracion">
+    <div class="sec-head"><h2 class="sec-title">Calibraci&oacute;n</h2>
+      <span class="sec-ref">MANUAL &sect;5.8 &middot; &sect;12.5 &middot; SOP-10</span></div>
+    <p class="sec-note" style="margin-bottom:18px">
+      El bucle de aprendizaje de la firma. Sin desenlaces registrados no hay tasa base, y sin tasa
+      base el DEALSCORE es una opini&oacute;n ordenada. Aqu&iacute; es donde el sistema deja de ser una plantilla.
+    </p>
+    <div class="cal-grid" id="calGrid"></div>
+  </section>
+
+  <section class="section" id="arquitectura">
+    <div class="sec-head"><h2 class="sec-title">Arquitectura</h2>
+      <span class="sec-ref">DE QU&Eacute; SE ALIMENTA CADA M&Oacute;DULO</span></div>
+    <div class="layers" id="layers"></div>
   </section>
 
   <footer class="foot">

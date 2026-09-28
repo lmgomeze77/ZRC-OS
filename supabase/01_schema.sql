@@ -52,6 +52,12 @@ create or replace function app_es_admin() returns boolean
 
 alter table app_members enable row level security;
 
+-- Los drop previos hacen el fichero reaplicable: sin ellos, una segunda
+-- pasada aborta con 42710 al chocar con la politica ya creada.
+drop policy if exists m_sel on app_members;
+drop policy if exists m_ins on app_members;
+drop policy if exists m_upd on app_members;
+drop policy if exists m_del on app_members;
 create policy m_sel on app_members for select
   using (user_id = auth.uid() or app_es_admin());
 create policy m_ins on app_members for insert with check (app_es_admin());
@@ -246,6 +252,11 @@ begin
     'scoring_bands','scores','score_values','outcomes'
   ] loop
     execute format('alter table %I enable row level security', t);
+    -- Reaplicable: se retira la politica antes de volver a crearla.
+    execute format('drop policy if exists %I on %I', t||'_sel', t);
+    execute format('drop policy if exists %I on %I', t||'_ins', t);
+    execute format('drop policy if exists %I on %I', t||'_upd', t);
+    execute format('drop policy if exists %I on %I', t||'_del', t);
     execute format(
       'create policy %I on %I for select using (app_es_miembro())',
       t||'_sel', t);

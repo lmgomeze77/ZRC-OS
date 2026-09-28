@@ -107,6 +107,11 @@ declare t text;
 begin
   foreach t in array array['documents','economics','strategy','investors','investor_outreach'] loop
     execute format('alter table %I enable row level security', t);
+    -- Reaplicable: se retira la politica antes de volver a crearla.
+    execute format('drop policy if exists %I on %I', t||'_sel', t);
+    execute format('drop policy if exists %I on %I', t||'_ins', t);
+    execute format('drop policy if exists %I on %I', t||'_upd', t);
+    execute format('drop policy if exists %I on %I', t||'_del', t);
     execute format('create policy %I on %I for select using (app_es_miembro())', t||'_sel', t);
     execute format('create policy %I on %I for insert with check (app_puede_escribir())', t||'_ins', t);
     execute format('create policy %I on %I for update using (app_puede_escribir()) with check (app_puede_escribir())', t||'_upd', t);

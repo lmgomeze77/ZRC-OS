@@ -14,9 +14,20 @@ Página estática de acceso restringido para Zenith Rise Capital.
 | `_headers` | Cabeceras para Netlify: `noindex`, `no-store`, `no-referrer`, `DENY` en frames. |
 | `tools/build.js` | Regenera `index.html` a partir del fuente y una clave. |
 
-## Protección
+## Portada
 
-El contenido va cifrado dentro de `index.html` y se descifra en el navegador:
+`index.html` es el ZRC OS conectado a Capa 3: acceso por enlace mágico, datos
+en vivo y data room por expediente. `app.html` queda como redirección a la
+portada, conservando query y fragmento para no romper los enlaces mágicos ya
+enviados ni los marcadores.
+
+La versión estática cifrada que ocupaba la portada se ha retirado: su contenido
+vive ahora en Capa 3, y el control de acceso lo ejerce RLS por persona en vez de
+una clave compartida por todos. Sigue recuperable en el historial de git.
+
+<details><summary>Cómo funcionaba el cifrado (histórico)</summary>
+
+El contenido iba cifrado dentro de `index.html` y se descifraba en el navegador:
 
 - **AES-256-GCM**, clave derivada con **PBKDF2-SHA256**, 300.000 iteraciones
 - Sal e IV aleatorios en cada build
@@ -31,6 +42,8 @@ Como el cifrado es lo único que protege el contenido, **la fuerza de la clave
 es la fuerza del sistema**: el blob es descargable por cualquiera y se puede
 atacar offline. Usa claves de alta entropía generadas al azar, nunca
 palabras elegidas a mano.
+
+</details>
 
 ## Requisito de despliegue
 

@@ -23,6 +23,7 @@ const state = {
   docs: [], econ: [], strat: [], outreach: [], mand: [], check: [], drError: null,
   ckPrio: '', ckEst: '',
   rubrics: [], gates: [], risk: [], doctError: null,
+  outcomes: [], outError: null,
   miembros: [], accesos: [],
   drTab: 'documentos',
   selected: null, fVert: '', fBand: '', sortKey: 'score', sortDir: -1,
@@ -111,6 +112,19 @@ async function loadAll() {
   } catch (err) {
     state.rubrics = []; state.gates = []; state.risk = [];
     state.doctError = String(err?.message ?? err);
+  }
+
+  // DESENLACES: opcional y aparte. Alimenta la calibracion; sin ellos las
+  // tarjetas de backtest no tienen nada que decir, y deben decir eso —
+  // no dar por hecho que estan vacios, que es lo que hacian antes.
+  try {
+    const out = await sb.from('outcomes').select('opportunity_id,resultado,fecha');
+    if (out.error) throw out.error;
+    state.outcomes = out.data ?? [];
+    state.outError = null;
+  } catch (err) {
+    state.outcomes = [];
+    state.outError = String(err?.message ?? err);
   }
 
   // DATA ROOM: opcional. Si 06_dataroom.sql no se ha aplicado todavia, sus
@@ -930,11 +944,59 @@ function renderCalibracion() {
                  ['P4','var(--b4)'],['DESCARTE','var(--b5)'],['NONE','rgba(52,65,86,.8)']];
   const max = Math.max(...orden.map(([k]) => cuenta[k])) || 1;
 
-  const conDesenlace = 0;  // outcomes aun vacia
+  // Se cuenta contra la tabla. Escribirlo a mano hacia que la tarjeta
+  // afirmase un hecho sobre los datos sin haberlos leido.
+  const conDesenlace = state.outcomes.length;
+  const cerrados = state.outcomes.filter(o => o.resultado === 'cerrado').length;
   const dist = orden.map(([k, c]) =>
     `<div class="bandrow"><span class="bl" style="color:${c}">${k === 'NONE' ? 'SIN PUNT.' : k}</span>
      <span class="bt"><span class="bf" style="width:${cuenta[k] / max * 100}%;background:${c}"></span></span>
      <span class="bn">${cuenta[k]} exp.</span></div>`).join('');
+
+  // Conversion y discriminante: se describe lo que HAY, no lo que se
+  // supone que hay. Si la tabla no se puede leer, se dice; no se pinta
+  // un cero que parece un hecho.
+  const RES = { cerrado:['cerrado','cerrados'], abortado:['abortado','abortados'],
+                perdido:['perdido','perdidos'], descartado:['descartado','descartados'] };
+  let convHtml, discTxt;
+  if (state.outError) {
+    convHtml = `<div class="empty-state">No se ha podido leer la tabla de desenlaces:
+      <code>${esc(state.outError)}</code></div>`;
+    discTxt = 'No se ha podido leer la tabla de desenlaces, así que no se puede contrastar nada.';
+  } else if (!conDesenlace) {
+    convHtml = `<div class="empty-state">Sin datos. Ningún expediente tiene desenlace registrado
+      (<span class="num">0</span> de <span class="num">${state.rows.length}</span>).<br />
+      <b style="color:var(--text);font-style:normal">Esta tarjeta no puede rellenarse desde el análisis:
+      exige el desenlace real de operaciones cerradas y abortadas.</b></div>`;
+    discTxt = `Sin datos. Se calcula como la diferencia entre la media de la dimensión en cerrados y
+      en no cerrados; una dimensión con discriminación cercana a cero no aporta información, por
+      mucho peso que se le haya dado.`;
+  } else {
+    const banda = new Map(state.rows.map(r => [r.opportunity_id, r.banda]));
+    const porBanda = {};
+    for (const o of state.outcomes) {
+      const b = banda.get(o.opportunity_id) ?? 'NONE';
+      (porBanda[b] ??= {})[o.resultado] = ((porBanda[b] ?? {})[o.resultado] ?? 0) + 1;
+    }
+    const filas = orden.map(([k]) => {
+      const d = porBanda[k]; if (!d) return '';
+      const det = Object.entries(d)
+        .map(([r, n]) => `${n} ${(RES[r] ?? [r, r])[n === 1 ? 0 : 1]}`).join(', ');
+      return `<div class="bandrow"><span class="bl">${k === 'NONE' ? 'SIN PUNT.' : k}</span>
+        <span class="bn" style="text-align:left;flex:1">${esc(det)}</span></div>`;
+    }).join('');
+    convHtml = `${filas}<p class="empty-state" style="padding-bottom:0">
+      <span class="num">${conDesenlace}</span> desenlace${conDesenlace === 1 ? '' : 's'} registrado${conDesenlace === 1 ? '' : 's'}
+      de <span class="num">${state.rows.length}</span> expedientes, de los cuales
+      <span class="num">${cerrados}</span> ${cerrados === 1 ? 'es un cierre' : 'son cierres'}. Por debajo de 10 no hay tasa de conversión
+      que leer: esto es el recuento, no un resultado.</p>`;
+    discTxt = cerrados
+      ? `Hay ${cerrados} cierre${cerrados === 1 ? '' : 's'} registrado${cerrados === 1 ? '' : 's'}. El contraste por dimensión
+         necesita las puntuaciones de cada expediente cerrado frente a los no cerrados; todavía no
+         se calcula en esta superficie.`
+      : `Sin contraste posible. Hay ${conDesenlace} desenlace${conDesenlace === 1 ? '' : 's'} registrado${conDesenlace === 1 ? '' : 's'} y
+         ninguno es un cierre, así que no existe el grupo «cerrados» contra el que comparar.`;
+  }
 
   $('calGrid').innerHTML = `
     <div class="card"><h3>Distribución por banda</h3>
@@ -943,24 +1005,19 @@ function renderCalibracion() {
 
     <div class="card"><h3>Conversión por banda</h3>
       <p class="card-note">Si P1+P2 no convierten claramente por encima de P3+P4, el score no separa.</p>
-      <div class="empty-state">Sin datos. Ningún expediente tiene desenlace registrado
-        (<span class="num">${conDesenlace}</span> de <span class="num">${state.rows.length}</span>).<br />
-        <b style="color:var(--text);font-style:normal">Esta tarjeta no puede rellenarse desde el análisis:
-        exige el desenlace real de operaciones cerradas y abortadas.</b></div></div>
+      ${convHtml}</div>
 
     <div class="card"><h3>Muestra para recalibrar</h3>
       <p class="card-note">Expedientes con desenlace conocido frente al mínimo accionable.</p>
       <div class="gauge-track"><span class="gauge-fill" style="width:${Math.min(100, conDesenlace / 20 * 100)}%"></span></div>
-      <div class="gauge-ticks"><span>0 ACTUAL</span><span>10 ORIENTATIVO</span><span>20 ACCIONABLE</span></div>
+      <div class="gauge-ticks"><span>${conDesenlace} ACTUAL</span><span>10 ORIENTATIVO</span><span>20 ACCIONABLE</span></div>
       <p class="empty-state" style="padding-bottom:0">Por debajo de 10, los resultados son orientativos.
         Incluye siempre los que salieron mal y los que descartaste: un backtest hecho solo con éxitos
         es sesgo de supervivencia.</p></div>
 
     <div class="card"><h3>Poder discriminante</h3>
       <p class="card-note">Cuánto separa cada dimensión los expedientes que cerraron de los que no.</p>
-      <div class="empty-state">Sin datos. Se calcula como la diferencia entre la media de la dimensión
-        en cerrados y en no cerrados; una dimensión con discriminación cercana a cero no aporta
-        información, por mucho peso que se le haya dado.<br /><br />
+      <div class="empty-state">${discTxt}<br /><br />
         <b style="color:var(--text);font-style:normal">Primer contraste esperado:</b> el manual asigna a
         <i>Acceso al decisor</i> el mayor peso por su correlación empírica con el cierre. Es la primera
         hipótesis que el backtest debe confirmar o refutar.</div></div>`;

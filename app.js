@@ -23,7 +23,7 @@ const state = {
   docs: [], econ: [], strat: [], outreach: [], mand: [], check: [], drError: null,
   ckPrio: '', ckEst: '',
   rubrics: [], gates: [], risk: [], doctError: null,
-  outcomes: [], outError: null,
+  outcomes: [], decisions: [], outError: null,
   miembros: [], accesos: [],
   drTab: 'documentos',
   selected: null, fVert: '', fBand: '', sortKey: 'score', sortDir: -1,
@@ -118,12 +118,17 @@ async function loadAll() {
   // tarjetas de backtest no tienen nada que decir, y deben decir eso —
   // no dar por hecho que estan vacios, que es lo que hacian antes.
   try {
-    const out = await sb.from('outcomes').select('opportunity_id,resultado,fecha');
-    if (out.error) throw out.error;
+    const [out, dec] = await Promise.all([
+      sb.from('outcomes').select('*'),
+      sb.from('decisions').select('*').order('decidido_en', { ascending: false })
+    ]);
+    const fallo = [out, dec].find(r => r.error);
+    if (fallo) throw fallo.error;
     state.outcomes = out.data ?? [];
+    state.decisions = dec.data ?? [];
     state.outError = null;
   } catch (err) {
-    state.outcomes = [];
+    state.outcomes = []; state.decisions = [];
     state.outError = String(err?.message ?? err);
   }
 
@@ -408,6 +413,132 @@ function panelReserva(r) {
   </div>`;
 }
 
+// ── DECISION Y DESENLACE ────────────────────────────────────────────
+// Las dos entidades de memoria del manual (Parte 12.2) que hasta ahora
+// solo se podian escribir abriendo el SQL Editor. El §12.3 pide registrar
+// los descartes con su motivo: si eso exige salir de la aplicacion, no se
+// hace. Por eso 'motivo' es obligatorio aqui, igual que en el esquema.
+const DEC_TIPO  = { 'go':'GO', 'no-go':'NO-GO', 'excepcion':'EXCEPCIÓN', 'aplazada':'APLAZADA' };
+const DEC_CLASE = { 'go':'go', 'no-go':'nogo', 'excepcion':'excepcion', 'aplazada':'aplazada' };
+const RESULTADO = { 'cerrado':'CERRADO', 'abortado':'ABORTADO',
+                    'perdido':'PERDIDO', 'descartado':'DESCARTADO' };
+const soloFecha = (t) => t ? String(t).slice(0, 10) : '';
+const opts = (mapa, sel) => Object.entries(mapa)
+  .map(([k, v]) => `<option value="${esc(k)}"${k === sel ? ' selected' : ''}>${esc(v)}</option>`).join('');
+
+function panelDecision(r) {
+  const id = r.opportunity_id;
+  if (state.outError) {
+    return `<div class="decision"><h4>⚖ Decisión y desenlace</h4>
+      <div class="pista">No se han podido leer las decisiones ni los desenlaces:
+      <code>${esc(state.outError)}</code></div></div>`;
+  }
+
+  const decs = state.decisions.filter(d => d.opportunity_id === id);
+  const out  = state.outcomes.find(o => o.opportunity_id === id);
+  const quien = (uid) => state.miembros.find(m => m.user_id === uid)?.nombre ?? null;
+
+  const historial = decs.length
+    ? `<div class="dec-lista">${decs.map(d => `
+        <div class="dec-fila">
+          <div class="dec-top">
+            <span class="dec-tipo ${esc(DEC_CLASE[d.tipo] ?? '')}">${esc(DEC_TIPO[d.tipo] ?? d.tipo)}</span>
+            <span class="dec-cuando">${esc(soloFecha(d.decidido_en))}</span></div>
+          <div>${esc(d.motivo)}</div>
+          ${quien(d.decidido_por) ? `<div class="dec-quien">${esc(quien(d.decidido_por))}</div>` : ''}
+        </div>`).join('')}</div>`
+    : '<div class="pista">Ninguna decisión registrada todavía.</div>';
+
+  const desenlace = out
+    ? `<div class="dec-lista"><div class="dec-fila">
+         <div class="dec-top">
+           <span class="dec-tipo ${out.resultado === 'cerrado' ? 'go' : 'nogo'}">${esc(RESULTADO[out.resultado] ?? out.resultado)}</span>
+           <span class="dec-cuando">${esc(soloFecha(out.fecha))}</span></div>
+         ${out.honorarios_eur != null ? `<div>Honorarios: <b>${esc(eur(out.honorarios_eur))}</b></div>` : ''}
+         ${out.motivo ? `<div>${esc(out.motivo)}</div>` : ''}
+         ${quien(out.registrado_por) ? `<div class="dec-quien">${esc(quien(out.registrado_por))}</div>` : ''}
+       </div></div>`
+    : `<div class="pista">Sin desenlace. Mientras no lo tenga, este expediente no cuenta
+       para la calibración: sin tasa base, el DEALSCORE es una opinión ordenada.</div>`;
+
+  if (!canWrite()) {
+    return `<div class="decision"><h4>⚖ Decisión y desenlace</h4>
+      <h5>Decisiones</h5>${historial}
+      <h5>Desenlace</h5>${desenlace}</div>`;
+  }
+
+  const hoy = new Date().toISOString().slice(0, 10);
+  return `<div class="decision">
+    <h4>⚖ Decisión y desenlace</h4>
+
+    <h5>Decisiones</h5>${historial}
+    <div class="frm-grid" style="margin-top:12px">
+      <div class="fld"><label for="decTipo">Nueva decisión</label>
+        <select id="decTipo">${opts(DEC_TIPO)}</select></div>
+      <div class="fld ancho"><label for="decMotivo">Motivo · obligatorio</label>
+        <textarea id="decMotivo" placeholder="Por qué se decide esto, con la información que hay hoy."></textarea></div>
+      <div class="fld ancho"><button class="btn-oro" id="decGuardar">REGISTRAR DECISIÓN</button></div>
+    </div>
+    <div class="pista">Las decisiones no se sobrescriben: se acumulan. Saber por qué se dijo
+      que no vale tanto como saber por qué se dijo que sí (§12.3).</div>
+    <div class="frm-msg" id="decMsg"></div>
+
+    <h5>Desenlace</h5>${desenlace}
+    <div class="frm-grid" style="margin-top:12px">
+      <div class="fld"><label for="outRes">Resultado</label>
+        <select id="outRes">${opts(RESULTADO, out?.resultado)}</select></div>
+      <div class="fld"><label for="outFecha">Fecha</label>
+        <input id="outFecha" type="date" value="${esc(soloFecha(out?.fecha) || hoy)}" /></div>
+      <div class="fld"><label for="outHon">Honorarios (€)</label>
+        <input id="outHon" type="number" step="1000" value="${out?.honorarios_eur ?? ''}" /></div>
+      <div class="fld ancho"><label for="outMotivo">Motivo</label>
+        <textarea id="outMotivo" placeholder="Qué ocurrió realmente.">${esc(out?.motivo ?? '')}</textarea></div>
+      <div class="fld ancho"><button class="btn-oro" id="outGuardar">${out ? 'ACTUALIZAR DESENLACE' : 'REGISTRAR DESENLACE'}</button></div>
+    </div>
+    <div class="pista">Registrar el desenlace cierra el expediente: pasa a
+      <b>cerrado</b> o <b>archivado</b> segun el resultado, y sale de la cola de pendientes.
+      Su banda sigue diciendo lo que dice la puntuación; el desenlace dice lo que pasó.</div>
+    <div class="frm-msg" id="outMsg"></div>
+  </div>`;
+}
+
+function cablearDecision(r) {
+  const id = r.opportunity_id;
+
+  $('decGuardar')?.addEventListener('click', async (ev) => {
+    const motivo = val('decMotivo');
+    if (!motivo) {
+      const m = $('decMsg');
+      m.className = 'frm-msg err';
+      m.textContent = 'EL MOTIVO ES OBLIGATORIO: UNA DECISIÓN SIN MOTIVO NO ES MEMORIA.';
+      return;
+    }
+    const uid = (await sb.auth.getUser()).data.user?.id ?? null;
+    guardar($('decMsg'), ev.target, () => sb.from('decisions').insert({
+      opportunity_id: id, tipo: val('decTipo'), motivo, decidido_por: uid
+    }), 'DECISIÓN REGISTRADA.');
+  });
+
+  $('outGuardar')?.addEventListener('click', async (ev) => {
+    const resultado = val('outRes');
+    const uid = (await sb.auth.getUser()).data.user?.id ?? null;
+    // El estado del expediente es consecuencia del desenlace, no un campo
+    // aparte que haya que acordarse de tocar. Si se escribiera solo desde
+    // aqui, un desenlace metido por SQL dejaria el estado sin actualizar.
+    guardar($('outMsg'), ev.target, async () => {
+      const { error } = await sb.from('outcomes').upsert({
+        opportunity_id: id, resultado, fecha: val('outFecha'),
+        honorarios_eur: num('outHon'), motivo: val('outMotivo') || null,
+        registrado_por: uid
+      }, { onConflict: 'opportunity_id' });
+      if (error) return { error };
+      return sb.from('opportunities')
+        .update({ estado: resultado === 'cerrado' ? 'cerrado' : 'archivado' })
+        .eq('id', id);
+    }, 'DESENLACE REGISTRADO.');
+  });
+}
+
 // ── DETALLE ─────────────────────────────────────────────────────────
 function renderDetail() {
   const r = state.rows.find(x => x.opportunity_id === state.selected);
@@ -463,10 +594,10 @@ function renderDetail() {
     </div>
     <div class="detail-cols">
       <div>${dimHtml}</div>
-      <div>${goNoGo(r, vals, sc)}${scopeHtml}${panelReserva(r)}${action}</div>
+      <div>${goNoGo(r, vals, sc)}${scopeHtml}${panelReserva(r)}${panelDecision(r)}${action}</div>
     </div>`;
 
-  if (!canWrite()) cablearReserva(r);
+  if (!canWrite()) { cablearReserva(r); cablearDecision(r); }
   if (canWrite()) {
     for (const el of $('detail').querySelectorAll('input[type=range]')) {
       el.addEventListener('input', () => {
@@ -482,6 +613,7 @@ function renderDetail() {
     $('saveScore')?.addEventListener('click', saveScore);
   }
   cablearReserva(r);
+  cablearDecision(r);
 }
 
 function cablearReserva(r) {

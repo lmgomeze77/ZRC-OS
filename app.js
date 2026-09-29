@@ -461,17 +461,15 @@ function panelDecision(r) {
     : `<div class="pista">Sin desenlace. Mientras no lo tenga, este expediente no cuenta
        para la calibración: sin tasa base, el DEALSCORE es una opinión ordenada.</div>`;
 
+  const hoy = new Date().toISOString().slice(0, 10);
+
   if (!canWrite()) {
-    return `<div class="decision"><h4>⚖ Decisión y desenlace</h4>
-      <h5>Decisiones</h5>${historial}
-      <h5>Desenlace</h5>${desenlace}</div>`;
+    return `<div class="decision"><h4>⚖ Decisiones</h4>${historial}</div>
+      <div class="decision"><h4>◈ Desenlace</h4>${desenlace}</div>`;
   }
 
-  const hoy = new Date().toISOString().slice(0, 10);
   return `<div class="decision">
-    <h4>⚖ Decisión y desenlace</h4>
-
-    <h5>Decisiones</h5>${historial}
+    <h4>⚖ Decisiones</h4>${historial}
     <div class="frm-grid" style="margin-top:12px">
       <div class="fld"><label for="decTipo">Nueva decisión</label>
         <select id="decTipo">${opts(DEC_TIPO)}</select></div>
@@ -482,8 +480,10 @@ function panelDecision(r) {
     <div class="pista">Las decisiones no se sobrescriben: se acumulan. Saber por qué se dijo
       que no vale tanto como saber por qué se dijo que sí (§12.3).</div>
     <div class="frm-msg" id="decMsg"></div>
+  </div>
 
-    <h5>Desenlace</h5>${desenlace}
+  <div class="decision">
+    <h4>◈ Desenlace</h4>${desenlace}
     <div class="frm-grid" style="margin-top:12px">
       <div class="fld"><label for="outRes">Resultado</label>
         <select id="outRes">${opts(RESULTADO, out?.resultado)}</select></div>
@@ -594,8 +594,9 @@ function renderDetail() {
     </div>
     <div class="detail-cols">
       <div>${dimHtml}</div>
-      <div>${goNoGo(r, vals, sc)}${scopeHtml}${panelReserva(r)}${panelDecision(r)}${action}</div>
-    </div>`;
+      <div>${goNoGo(r, vals, sc)}${scopeHtml}${action}</div>
+    </div>
+    <div class="detail-gov">${panelReserva(r)}${panelDecision(r)}</div>`;
 
   if (!canWrite()) { cablearReserva(r); cablearDecision(r); }
   if (canWrite()) {
@@ -1173,6 +1174,23 @@ function renderArquitectura() {
      <span class="flag flag-${cls}">${esc(txt)}</span></div>`).join('');
 }
 
+// Pestanas del expediente. La ficha y el data room son el mismo objeto:
+// se alternan en el mismo sitio en vez de vivir en secciones distintas.
+function cablearPestanasExpediente() {
+  const tabs = $('dealTabs'); if (!tabs) return;
+  for (const b of tabs.querySelectorAll('[data-pane]')) {
+    b.addEventListener('click', () => {
+      for (const o of tabs.querySelectorAll('[data-pane]')) {
+        const activo = o === b;
+        o.setAttribute('aria-selected', String(activo));
+        o.setAttribute('aria-pressed', String(activo));
+        $(o.dataset.pane).hidden = !activo;
+      }
+    });
+    b.setAttribute('aria-pressed', b.getAttribute('aria-selected'));
+  }
+}
+
 function renderAll() { renderStats(); renderQueue(); renderFilters(); renderPipe(); renderDetail(); renderDataroom(); renderCalibracion(); renderArquitectura(); }
 
 function select(id) { state.selected = id; state.draft = null; renderPipe(); renderDetail(); renderDataroom(); $('detail').scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }
@@ -1232,6 +1250,7 @@ async function boot() {
   $('app').hidden = false;
   renderWhoami();
   wire();
+  cablearPestanasExpediente();
   try {
     await loadAll();
     if (!state.rows.length) banner('<b>SIN DATOS</b><br>La base responde pero no devuelve expedientes. Revisa que se haya aplicado la carga (05_seed.sql).');

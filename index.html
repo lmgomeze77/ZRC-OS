@@ -36,7 +36,10 @@
   --b2: #D9B65C;
   --b3: #B8933C;
   --b4: #8A6E2E;
-  --b5: #5E4D24;
+  /* DESCARTE no es "la banda mas baja": es un estado terminal. Sale de la
+     rampa de oro y pasa a neutro. Ademas, #5E4D24 daba 2,23:1 sobre el
+     panel -- por debajo del minimo de 3:1 y practicamente ilegible. */
+  --b5: #6B7688;
 
   --mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
   --display: 'Cormorant Garamond', Georgia, 'Times New Roman', serif;
@@ -67,6 +70,12 @@ button { background: none; border: none; cursor: pointer; }
 ::-webkit-scrollbar-thumb { background: rgba(201,168,76,.22); border-radius: 4px; }
 
 .shell { max-width: 1120px; margin: 0 auto; padding-left: 24px; padding-right: 24px; }
+/* En pantalla de trabajo el ancho de lectura deja de mandar: manda el area
+   de trabajo. Con 1120px el panel del expediente se quedaba en 724 y los
+   paneles de gobierno no entraban en paralelo. El texto corrido sigue
+   acotado por sus propios max-width en ch, asi que no se vuelve ilegible. */
+@media (min-width: 1440px) { .shell { max-width: 1440px; } }
+@media (min-width: 1700px) { .shell { max-width: 1600px; } }
 
 .mono { font-family: var(--mono); }
 .num { font-variant-numeric: tabular-nums; font-family: var(--mono); }
@@ -248,8 +257,65 @@ table.pipe td { padding: 11px 12px; vertical-align: middle; font-size: 13.5px; }
 .score-bar { flex: 1; height: 5px; background: rgba(165,180,200,.10); border-radius: 3px; overflow: hidden; min-width: 54px; }
 .score-fill { display: block; height: 100%; border-radius: 3px; transition: width .35s ease; }
 
+/* ── AREA DE TRABAJO ──────────────────────────────────────────────
+   Un dealroom no es un documento que se lee de arriba abajo: es una
+   lista de operaciones y, al lado, la que estas trabajando. Apilados,
+   la ficha mide 1,6 pantallas y abrir un expediente te deja sin la
+   lista. En pantalla ancha van en paralelo y la lista se queda fija. */
+.work { display: block; }
+
+@media (min-width: 1240px) {
+  .work {
+    display: grid; grid-template-columns: 400px minmax(0, 1fr);
+    gap: 18px; align-items: start;
+  }
+  .work-list {
+    position: sticky; top: 14px;
+    max-height: calc(100vh - 28px);
+    display: flex; flex-direction: column; min-height: 0;
+  }
+  .work-list .table-scroll { overflow: auto; flex: 1; min-height: 0; }
+  /* En 330px no caben cinco columnas. Se quedan las tres que deciden:
+     quien es, cuanto puntua y en que banda cae. Vertical y ambito
+     siguen en la ficha, que es donde se leen de verdad. */
+  .work-list table.pipe { min-width: 0; }
+  .work-list .pipe th:nth-child(2), .work-list .pipe td:nth-child(2),
+  .work-list .pipe th:nth-child(5), .work-list .pipe td:nth-child(5) { display: none; }
+  .work-list .pipe th, .work-list .pipe td { padding-left: 10px; padding-right: 10px; }
+  /* Sin esto la barra del DEALSCORE empuja la columna de banda fuera del
+     panel y desaparece la senal principal de la lista. En el panel
+     estrecho manda la cifra; la barra se queda en la tabla ancha. */
+  .work-list .table-scroll { overflow-x: hidden; }
+  .work-list .score-bar { display: none; }
+  /* .score-cell trae min-width:128px para la tabla ancha; en una celda de
+     84px desborda y el numero se sale del recorte. */
+  .work-list .score-cell { justify-content: flex-end; min-width: 0; }
+  /* Reparto fijo: sin esto la tabla conserva su ancho natural, la cifra se
+     corta y la banda -- la senal principal -- se sale del panel. */
+  .work-list table.pipe { table-layout: fixed; width: 100%; }
+  .work-list .pipe th:nth-child(3), .work-list .pipe td:nth-child(3) {
+    width: 84px; text-align: right; overflow: hidden; }
+  .work-list .pipe th:nth-child(4), .work-list .pipe td:nth-child(4) {
+    width: 96px; text-align: right; }
+  .work-list .score-num.is-empty { font-size: 7.5px; letter-spacing: .4px; }
+  .work-list .td-name { white-space: normal; }
+  .work-list .pill { font-size: 8px; padding: 2px 5px; }
+  .work-list .pill-RESERVADO { display: block; width: fit-content;
+    margin: 4px 0 0 auto !important; font-size: 7px; letter-spacing: .3px; padding: 2px 4px; }
+  /* La cabecera se queda mientras la lista rueda. */
+  .work-list .pipe thead th { position: sticky; top: 0; z-index: 2; }
+  .detail { margin-top: 0; }
+}
+
+/* El expediente con pestanas. El data room dejo de ser una seccion a mil
+   pixeles de la ficha: es el mismo expediente, y se mira desde aqui. */
+.deal-tabs { display: flex; gap: 6px; align-items: center; margin-bottom: 12px; flex-wrap: wrap; }
+.deal-ref { margin-left: auto; font-family: var(--mono); font-size: 9px;
+  letter-spacing: 1.1px; color: var(--faint); text-transform: uppercase; }
+#drPane { border: 1px solid var(--line); background: var(--panel); padding: 20px; }
+
 .detail {
-  margin-top: 20px; border: 1px solid var(--line);
+  margin-top: 0; border: 1px solid var(--line);
   background: var(--panel); padding: 20px;
 }
 .detail-head { display: flex; justify-content: space-between; gap: 18px; flex-wrap: wrap; align-items: flex-start; }
@@ -265,6 +331,12 @@ table.pipe td { padding: 11px 12px; vertical-align: middle; font-size: 13.5px; }
 .detail-cols { display: grid; gap: 26px; margin-top: 22px; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); }
 @media (max-width: 820px) { .detail-cols { grid-template-columns: 1fr; } }
 
+/* Reserva y decision no caben en la columna estrecha: en pila se comian
+   mil pixeles de alto. Van en una fila ancha propia, en paralelo. */
+.detail-gov { display: grid; gap: 18px; align-items: start;
+  grid-template-columns: repeat(auto-fit, minmax(275px, 1fr)); }
+.detail-gov > .reserva, .detail-gov > .decision { margin-top: 18px; }
+
 .dim-row { padding: 9px 0; border-bottom: 1px solid var(--line-2); }
 .dim-row:last-child { border-bottom: none; }
 .dim-top { display: flex; align-items: center; gap: 10px; }
@@ -272,7 +344,13 @@ table.pipe td { padding: 11px 12px; vertical-align: middle; font-size: 13.5px; }
 .dim-name { font-size: 13px; color: var(--text); flex: 1; min-width: 0; }
 .dim-w { font-family: var(--mono); font-size: 9px; color: var(--faint); letter-spacing: .5px; }
 .dim-val { font-family: var(--mono); font-size: 13px; font-weight: 700; color: var(--cream); min-width: 22px; text-align: right; font-variant-numeric: tabular-nums; }
-.dim-bar-row { display: flex; align-items: center; gap: 10px; margin-top: 6px; }
+.dim-bar-row { display: flex; align-items: center; gap: 10px; margin-top: 5px; }
+/* La fila de dimension ocupaba 78px por un apilado de cuatro lineas. El
+   nombre no necesita toda la anchura del panel: se acota y el peso y el
+   valor se pegan a el, en vez de irse al otro extremo de la pantalla. */
+.dim-name { max-width: 34ch; flex: 0 1 auto; }
+.dim-top { gap: 12px; }
+.dim-top .dim-w { margin-left: auto; }
 .dim-track { flex: 1; height: 6px; background: rgba(165,180,200,.10); border-radius: 3px; overflow: hidden; }
 .dim-fill { display: block; height: 100%; background: var(--gold); border-radius: 3px; transition: width .3s ease; }
 
@@ -601,9 +679,8 @@ table.pipe td select.ck-est { background: var(--panel-2); border: 1px solid var(
       <a href="#estado">01 &middot; ESTADO</a>
       <a href="#pendientes">02 &middot; PENDIENTES</a>
       <a href="#pipeline">03 &middot; PIPELINE DEALSCORE</a>
-      <a href="#dataroom">04 &middot; DATA ROOM</a>
-      <a href="#calibracion">05 &middot; CALIBRACI&Oacute;N</a>
-      <a href="#arquitectura">06 &middot; ARQUITECTURA</a>
+      <a href="#calibracion">04 &middot; CALIBRACI&Oacute;N</a>
+      <a href="#arquitectura">05 &middot; ARQUITECTURA</a>
     </nav>
   </header>
 
@@ -629,7 +706,7 @@ table.pipe td select.ck-est { background: var(--panel-2); border: 1px solid var(
   <section class="section" id="pipeline">
     <div class="sec-head"><h2 class="sec-title">Pipeline DEALSCORE</h2>
       <span class="sec-ref" id="pipeRef">&mdash;</span></div>
-    <div class="toolbar">
+    <div class="toolbar" id="pipeToolbar">
       <select id="fVert" aria-label="Filtrar por vertical"><option value="">TODAS LAS VERTICALES</option></select>
       <select id="fBand" aria-label="Filtrar por banda">
         <option value="">TODAS LAS BANDAS</option>
@@ -642,27 +719,31 @@ table.pipe td select.ck-est { background: var(--panel-2); border: 1px solid var(
       </select>
       <span class="toolbar-count" id="pipeCount">&mdash;</span>
     </div>
-    <div class="table-scroll">
-      <table class="pipe">
-        <thead><tr>
-          <th>Expediente</th><th class="sortable" data-sort="vertical">Vertical</th>
-          <th class="sortable" data-sort="score">DEALSCORE</th><th>Banda</th><th>&Aacute;mbito</th>
-        </tr></thead>
-        <tbody id="pipeBody"></tbody>
-      </table>
+    <div class="work">
+      <div class="work-list">
+        <div class="table-scroll">
+          <table class="pipe">
+            <thead><tr>
+              <th>Expediente</th><th class="sortable" data-sort="vertical">Vertical</th>
+              <th class="sortable" data-sort="score">DEALSCORE</th><th>Banda</th><th>&Aacute;mbito</th>
+            </tr></thead>
+            <tbody id="pipeBody"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="work-main">
+        <div class="deal-tabs" id="dealTabs" role="tablist">
+          <button class="tbtn" data-pane="detail" role="tab" aria-selected="true">Puntuaci&oacute;n y gobierno</button>
+          <button class="tbtn" data-pane="drPane" role="tab" aria-selected="false">Data room</button>
+          <span class="deal-ref" id="drRef">&mdash;</span>
+        </div>
+        <div class="detail" id="detail"></div>
+        <div id="drPane" hidden>
+          <div class="dr-tabs" id="drTabs"></div>
+          <div id="drBody"></div>
+        </div>
+      </div>
     </div>
-    <div class="detail" id="detail"></div>
-  </section>
-
-  <section class="section" id="dataroom">
-    <div class="sec-head"><h2 class="sec-title">Data room</h2>
-      <span class="sec-ref" id="drRef">&mdash;</span></div>
-    <p class="sec-note" style="margin-bottom:16px">
-      Documentaci&oacute;n, mandato, economics, estrategia e inversores del
-      expediente seleccionado arriba.
-    </p>
-    <div class="dr-tabs" id="drTabs"></div>
-    <div id="drBody"></div>
   </section>
 
   <section class="section" id="calibracion">

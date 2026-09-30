@@ -616,6 +616,14 @@ table.pipe td select.ck-est { background: var(--panel-2); border: 1px solid var(
 .doc-abrir:hover { color: #9AD8EC; text-decoration: underline; }
 .doc-meta { font-family: var(--mono); font-size: 8.5px; letter-spacing: .5px;
   color: var(--faint); margin-top: 4px; }
+/* Adjuntar a un hueco declarado. El input va dentro del label y oculto:
+   asi el boton es el label y no hay dos controles para una sola accion. */
+.doc-adj { display: inline-block; margin-top: 8px; cursor: pointer;
+  font-family: var(--mono); font-size: 8.5px; font-weight: 700; letter-spacing: 1px;
+  text-transform: uppercase; color: var(--cyan);
+  border: 1px solid rgba(79,182,214,.4); border-radius: 2px; padding: 5px 10px; }
+.doc-adj:hover { background: var(--cyan-soft); color: #9AD8EC; }
+.doc-adj input { display: none; }
 .fld input[type=file] {
   background: var(--panel-2); border: 1px solid var(--line); border-radius: 2px;
   color: var(--text); font-family: var(--mono); font-size: 10px; padding: 8px 10px; width: 100%; }

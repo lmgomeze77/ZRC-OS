@@ -707,6 +707,25 @@ const pesa = (b) => b == null ? '' : b < 1024 * 1024
   ? `${Math.max(1, Math.round(b / 1024))} kB`
   : `${(b / 1024 / 1024).toFixed(1)} MB`;
 
+// Compartido por el formulario de alta y por el boton de adjuntar: las
+// dos comprobaciones van ANTES de tocar la red, para no subir 26 MB y
+// rechazarlos despues.
+function pegaAlFichero(f) {
+  if (f.size > MAX_BYTES) return `EL FICHERO PESA ${pesa(f.size).toUpperCase()}. EL TOPE SON 25 MB.`;
+  if (!EXT_OK.includes(extDe(f.name)))
+    return `TIPO NO ADMITIDO (.${extDe(f.name).toUpperCase()}). SE ADMITEN: ${EXT_OK.join(', ').toUpperCase()}.`;
+  return null;
+}
+
+// La ruta empieza por el id del expediente: es lo que miran las politicas
+// del cubo para heredar la reserva (app_ve_ruta).
+async function subirAlCubo(opportunityId, fichero) {
+  const ruta = `${opportunityId}/${Date.now()}-${nombreSeguro(fichero.name)}`;
+  const { error } = await sb.storage.from(CUBO)
+    .upload(ruta, fichero, { contentType: fichero.type || undefined, upsert: false });
+  return { ruta, error };
+}
+
 const val = (id) => { const e = $(id); return e ? e.value.trim() : ''; };
 const num = (id) => { const v = val(id); return v === '' ? null : Number(v); };
 const chk = (id) => { const e = $(id); return e ? e.checked : false; };
@@ -751,7 +770,11 @@ function drDocumentos(id) {
                  <div class="doc-meta">${esc(d.nombre_fichero ?? '')}${d.bytes ? ' · ' + pesa(d.bytes) : ''}</div>`
               : d.url
               ? `<a href="${esc(d.url)}" target="_blank" rel="noopener">ABRIR ENLACE</a>`
-              : `<div class="pend">▲ ${esc(String(d.estado).toUpperCase())}</div>`}
+              : `<div class="pend">▲ ${esc(String(d.estado).toUpperCase())}</div>
+                 ${canWrite() ? `<label class="doc-adj">
+                   <input type="file" data-adj="${esc(d.id)}" accept=".${EXT_OK.join(',.')}" />
+                   ADJUNTAR FICHERO</label>
+                   <div class="frm-msg" id="adj-${esc(d.id)}"></div>` : ''}`}
             ${canWrite() ? `<div class="fila-acc" style="margin-top:9px">
               <button class="btn-mini" data-del-doc="${esc(d.id)}"${
                 d.storage_path ? ` data-ruta="${esc(d.storage_path)}"` : ''}>ELIMINAR</button></div>` : ''}
@@ -1023,12 +1046,7 @@ function cablearFormularios(id) {
     // Lo impone tambien la base (doc_una_sola_fuente), pero decirlo aqui
     // evita un rechazo del driver con un mensaje ilegible.
     if (fichero && enlace) return noVale('UN DOCUMENTO ES FICHERO O ENLACE, NO LAS DOS COSAS.');
-    if (fichero) {
-      if (fichero.size > MAX_BYTES)
-        return noVale(`EL FICHERO PESA ${pesa(fichero.size).toUpperCase()}. EL TOPE SON 25 MB.`);
-      if (!EXT_OK.includes(extDe(fichero.name)))
-        return noVale(`TIPO NO ADMITIDO (.${extDe(fichero.name).toUpperCase()}). SE ADMITEN: ${EXT_OK.join(', ').toUpperCase()}.`);
-    }
+    if (fichero) { const pega = pegaAlFichero(fichero); if (pega) return noVale(pega); }
 
     const autor = await uid();
     const base = {
@@ -1042,14 +1060,10 @@ function cablearFormularios(id) {
       }), 'DOCUMENTO AÑADIDO.');
     }
 
-    // La ruta empieza por el id del expediente: es lo que miran las
-    // politicas del cubo para heredar la reserva (app_ve_ruta).
-    const ruta = `${id}/${Date.now()}-${nombreSeguro(fichero.name)}`;
     const m = $('dMsg'); m.className = 'frm-msg'; m.textContent = 'SUBIENDO…';
     guardar($('dMsg'), ev.target, async () => {
-      const sub = await sb.storage.from(CUBO)
-        .upload(ruta, fichero, { contentType: fichero.type || undefined, upsert: false });
-      if (sub.error) return { error: sub.error };
+      const { ruta, error } = await subirAlCubo(id, fichero);
+      if (error) return { error };
       const fila = await sb.from('documents').insert({
         ...base, estado: 'disponible', url: null, storage_path: ruta,
         nombre_fichero: fichero.name, bytes: fichero.size
@@ -1074,6 +1088,31 @@ function cablearFormularios(id) {
         if (ruta) return sb.storage.from(CUBO).remove([ruta]);
         return { error: null };
       });
+    });
+  }
+
+  // Adjuntar a un documento YA registrado. Es un UPDATE, no un insert: las
+  // filas 'pendiente' son huecos declarados con su titulo, su categoria y
+  // su descripcion ya escritos. Dar de alta otra fila con el mismo titulo
+  // dejaria el data room con duplicados, que es justo lo que no se le
+  // ensena a un comprador.
+  for (const inp of document.querySelectorAll('[data-adj]')) {
+    inp.addEventListener('change', async () => {
+      const fichero = inp.files?.[0]; if (!fichero) return;
+      const msg = $('adj-' + inp.dataset.adj);
+      const pega = pegaAlFichero(fichero);
+      if (pega) { msg.className = 'frm-msg err'; msg.textContent = pega; inp.value = ''; return; }
+      msg.className = 'frm-msg'; msg.textContent = 'SUBIENDO…';
+      guardar(msg, null, async () => {
+        const { ruta, error } = await subirAlCubo(id, fichero);
+        if (error) return { error };
+        const fila = await sb.from('documents').update({
+          storage_path: ruta, nombre_fichero: fichero.name, bytes: fichero.size,
+          url: null, estado: 'disponible'
+        }).eq('id', inp.dataset.adj);
+        if (fila.error) { await sb.storage.from(CUBO).remove([ruta]); return { error: fila.error }; }
+        return { error: null };
+      }, 'FICHERO ADJUNTADO.');
     });
   }
 

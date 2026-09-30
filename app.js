@@ -23,6 +23,7 @@ const state = {
   docs: [], econ: [], strat: [], outreach: [], mand: [], check: [], drError: null,
   ckPrio: '', ckEst: '',
   rubrics: [], gates: [], risk: [], doctError: null,
+  outcomes: [], decisions: [], outError: null,
   miembros: [], accesos: [],
   drTab: 'documentos',
   selected: null, fVert: '', fBand: '', sortKey: 'score', sortDir: -1,
@@ -111,6 +112,24 @@ async function loadAll() {
   } catch (err) {
     state.rubrics = []; state.gates = []; state.risk = [];
     state.doctError = String(err?.message ?? err);
+  }
+
+  // DESENLACES: opcional y aparte. Alimenta la calibracion; sin ellos las
+  // tarjetas de backtest no tienen nada que decir, y deben decir eso —
+  // no dar por hecho que estan vacios, que es lo que hacian antes.
+  try {
+    const [out, dec] = await Promise.all([
+      sb.from('outcomes').select('*'),
+      sb.from('decisions').select('*').order('decidido_en', { ascending: false })
+    ]);
+    const fallo = [out, dec].find(r => r.error);
+    if (fallo) throw fallo.error;
+    state.outcomes = out.data ?? [];
+    state.decisions = dec.data ?? [];
+    state.outError = null;
+  } catch (err) {
+    state.outcomes = []; state.decisions = [];
+    state.outError = String(err?.message ?? err);
   }
 
   // DATA ROOM: opcional. Si 06_dataroom.sql no se ha aplicado todavia, sus
@@ -394,6 +413,132 @@ function panelReserva(r) {
   </div>`;
 }
 
+// ── DECISION Y DESENLACE ────────────────────────────────────────────
+// Las dos entidades de memoria del manual (Parte 12.2) que hasta ahora
+// solo se podian escribir abriendo el SQL Editor. El §12.3 pide registrar
+// los descartes con su motivo: si eso exige salir de la aplicacion, no se
+// hace. Por eso 'motivo' es obligatorio aqui, igual que en el esquema.
+const DEC_TIPO  = { 'go':'GO', 'no-go':'NO-GO', 'excepcion':'EXCEPCIÓN', 'aplazada':'APLAZADA' };
+const DEC_CLASE = { 'go':'go', 'no-go':'nogo', 'excepcion':'excepcion', 'aplazada':'aplazada' };
+const RESULTADO = { 'cerrado':'CERRADO', 'abortado':'ABORTADO',
+                    'perdido':'PERDIDO', 'descartado':'DESCARTADO' };
+const soloFecha = (t) => t ? String(t).slice(0, 10) : '';
+const opts = (mapa, sel) => Object.entries(mapa)
+  .map(([k, v]) => `<option value="${esc(k)}"${k === sel ? ' selected' : ''}>${esc(v)}</option>`).join('');
+
+function panelDecision(r) {
+  const id = r.opportunity_id;
+  if (state.outError) {
+    return `<div class="decision"><h4>⚖ Decisión y desenlace</h4>
+      <div class="pista">No se han podido leer las decisiones ni los desenlaces:
+      <code>${esc(state.outError)}</code></div></div>`;
+  }
+
+  const decs = state.decisions.filter(d => d.opportunity_id === id);
+  const out  = state.outcomes.find(o => o.opportunity_id === id);
+  const quien = (uid) => state.miembros.find(m => m.user_id === uid)?.nombre ?? null;
+
+  const historial = decs.length
+    ? `<div class="dec-lista">${decs.map(d => `
+        <div class="dec-fila">
+          <div class="dec-top">
+            <span class="dec-tipo ${esc(DEC_CLASE[d.tipo] ?? '')}">${esc(DEC_TIPO[d.tipo] ?? d.tipo)}</span>
+            <span class="dec-cuando">${esc(soloFecha(d.decidido_en))}</span></div>
+          <div>${esc(d.motivo)}</div>
+          ${quien(d.decidido_por) ? `<div class="dec-quien">${esc(quien(d.decidido_por))}</div>` : ''}
+        </div>`).join('')}</div>`
+    : '<div class="pista">Ninguna decisión registrada todavía.</div>';
+
+  const desenlace = out
+    ? `<div class="dec-lista"><div class="dec-fila">
+         <div class="dec-top">
+           <span class="dec-tipo ${out.resultado === 'cerrado' ? 'go' : 'nogo'}">${esc(RESULTADO[out.resultado] ?? out.resultado)}</span>
+           <span class="dec-cuando">${esc(soloFecha(out.fecha))}</span></div>
+         ${out.honorarios_eur != null ? `<div>Honorarios: <b>${esc(eur(out.honorarios_eur))}</b></div>` : ''}
+         ${out.motivo ? `<div>${esc(out.motivo)}</div>` : ''}
+         ${quien(out.registrado_por) ? `<div class="dec-quien">${esc(quien(out.registrado_por))}</div>` : ''}
+       </div></div>`
+    : `<div class="pista">Sin desenlace. Mientras no lo tenga, este expediente no cuenta
+       para la calibración: sin tasa base, el DEALSCORE es una opinión ordenada.</div>`;
+
+  const hoy = new Date().toISOString().slice(0, 10);
+
+  if (!canWrite()) {
+    return `<div class="decision"><h4>⚖ Decisiones</h4>${historial}</div>
+      <div class="decision"><h4>◈ Desenlace</h4>${desenlace}</div>`;
+  }
+
+  return `<div class="decision">
+    <h4>⚖ Decisiones</h4>${historial}
+    <div class="frm-grid" style="margin-top:12px">
+      <div class="fld"><label for="decTipo">Nueva decisión</label>
+        <select id="decTipo">${opts(DEC_TIPO)}</select></div>
+      <div class="fld ancho"><label for="decMotivo">Motivo · obligatorio</label>
+        <textarea id="decMotivo" placeholder="Por qué se decide esto, con la información que hay hoy."></textarea></div>
+      <div class="fld ancho"><button class="btn-oro" id="decGuardar">REGISTRAR DECISIÓN</button></div>
+    </div>
+    <div class="pista">Las decisiones no se sobrescriben: se acumulan. Saber por qué se dijo
+      que no vale tanto como saber por qué se dijo que sí (§12.3).</div>
+    <div class="frm-msg" id="decMsg"></div>
+  </div>
+
+  <div class="decision">
+    <h4>◈ Desenlace</h4>${desenlace}
+    <div class="frm-grid" style="margin-top:12px">
+      <div class="fld"><label for="outRes">Resultado</label>
+        <select id="outRes">${opts(RESULTADO, out?.resultado)}</select></div>
+      <div class="fld"><label for="outFecha">Fecha</label>
+        <input id="outFecha" type="date" value="${esc(soloFecha(out?.fecha) || hoy)}" /></div>
+      <div class="fld"><label for="outHon">Honorarios (€)</label>
+        <input id="outHon" type="number" step="1000" value="${out?.honorarios_eur ?? ''}" /></div>
+      <div class="fld ancho"><label for="outMotivo">Motivo</label>
+        <textarea id="outMotivo" placeholder="Qué ocurrió realmente.">${esc(out?.motivo ?? '')}</textarea></div>
+      <div class="fld ancho"><button class="btn-oro" id="outGuardar">${out ? 'ACTUALIZAR DESENLACE' : 'REGISTRAR DESENLACE'}</button></div>
+    </div>
+    <div class="pista">Registrar el desenlace cierra el expediente: pasa a
+      <b>cerrado</b> o <b>archivado</b> segun el resultado, y sale de la cola de pendientes.
+      Su banda sigue diciendo lo que dice la puntuación; el desenlace dice lo que pasó.</div>
+    <div class="frm-msg" id="outMsg"></div>
+  </div>`;
+}
+
+function cablearDecision(r) {
+  const id = r.opportunity_id;
+
+  $('decGuardar')?.addEventListener('click', async (ev) => {
+    const motivo = val('decMotivo');
+    if (!motivo) {
+      const m = $('decMsg');
+      m.className = 'frm-msg err';
+      m.textContent = 'EL MOTIVO ES OBLIGATORIO: UNA DECISIÓN SIN MOTIVO NO ES MEMORIA.';
+      return;
+    }
+    const uid = (await sb.auth.getUser()).data.user?.id ?? null;
+    guardar($('decMsg'), ev.target, () => sb.from('decisions').insert({
+      opportunity_id: id, tipo: val('decTipo'), motivo, decidido_por: uid
+    }), 'DECISIÓN REGISTRADA.');
+  });
+
+  $('outGuardar')?.addEventListener('click', async (ev) => {
+    const resultado = val('outRes');
+    const uid = (await sb.auth.getUser()).data.user?.id ?? null;
+    // El estado del expediente es consecuencia del desenlace, no un campo
+    // aparte que haya que acordarse de tocar. Si se escribiera solo desde
+    // aqui, un desenlace metido por SQL dejaria el estado sin actualizar.
+    guardar($('outMsg'), ev.target, async () => {
+      const { error } = await sb.from('outcomes').upsert({
+        opportunity_id: id, resultado, fecha: val('outFecha'),
+        honorarios_eur: num('outHon'), motivo: val('outMotivo') || null,
+        registrado_por: uid
+      }, { onConflict: 'opportunity_id' });
+      if (error) return { error };
+      return sb.from('opportunities')
+        .update({ estado: resultado === 'cerrado' ? 'cerrado' : 'archivado' })
+        .eq('id', id);
+    }, 'DESENLACE REGISTRADO.');
+  });
+}
+
 // ── DETALLE ─────────────────────────────────────────────────────────
 function renderDetail() {
   const r = state.rows.find(x => x.opportunity_id === state.selected);
@@ -449,10 +594,11 @@ function renderDetail() {
     </div>
     <div class="detail-cols">
       <div>${dimHtml}</div>
-      <div>${goNoGo(r, vals, sc)}${scopeHtml}${panelReserva(r)}${action}</div>
-    </div>`;
+      <div>${goNoGo(r, vals, sc)}${scopeHtml}${action}</div>
+    </div>
+    <div class="detail-gov">${panelReserva(r)}${panelDecision(r)}</div>`;
 
-  if (!canWrite()) cablearReserva(r);
+  if (!canWrite()) { cablearReserva(r); cablearDecision(r); }
   if (canWrite()) {
     for (const el of $('detail').querySelectorAll('input[type=range]')) {
       el.addEventListener('input', () => {
@@ -468,6 +614,7 @@ function renderDetail() {
     $('saveScore')?.addEventListener('click', saveScore);
   }
   cablearReserva(r);
+  cablearDecision(r);
 }
 
 function cablearReserva(r) {
@@ -930,11 +1077,59 @@ function renderCalibracion() {
                  ['P4','var(--b4)'],['DESCARTE','var(--b5)'],['NONE','rgba(52,65,86,.8)']];
   const max = Math.max(...orden.map(([k]) => cuenta[k])) || 1;
 
-  const conDesenlace = 0;  // outcomes aun vacia
+  // Se cuenta contra la tabla. Escribirlo a mano hacia que la tarjeta
+  // afirmase un hecho sobre los datos sin haberlos leido.
+  const conDesenlace = state.outcomes.length;
+  const cerrados = state.outcomes.filter(o => o.resultado === 'cerrado').length;
   const dist = orden.map(([k, c]) =>
     `<div class="bandrow"><span class="bl" style="color:${c}">${k === 'NONE' ? 'SIN PUNT.' : k}</span>
      <span class="bt"><span class="bf" style="width:${cuenta[k] / max * 100}%;background:${c}"></span></span>
      <span class="bn">${cuenta[k]} exp.</span></div>`).join('');
+
+  // Conversion y discriminante: se describe lo que HAY, no lo que se
+  // supone que hay. Si la tabla no se puede leer, se dice; no se pinta
+  // un cero que parece un hecho.
+  const RES = { cerrado:['cerrado','cerrados'], abortado:['abortado','abortados'],
+                perdido:['perdido','perdidos'], descartado:['descartado','descartados'] };
+  let convHtml, discTxt;
+  if (state.outError) {
+    convHtml = `<div class="empty-state">No se ha podido leer la tabla de desenlaces:
+      <code>${esc(state.outError)}</code></div>`;
+    discTxt = 'No se ha podido leer la tabla de desenlaces, así que no se puede contrastar nada.';
+  } else if (!conDesenlace) {
+    convHtml = `<div class="empty-state">Sin datos. Ningún expediente tiene desenlace registrado
+      (<span class="num">0</span> de <span class="num">${state.rows.length}</span>).<br />
+      <b style="color:var(--text);font-style:normal">Esta tarjeta no puede rellenarse desde el análisis:
+      exige el desenlace real de operaciones cerradas y abortadas.</b></div>`;
+    discTxt = `Sin datos. Se calcula como la diferencia entre la media de la dimensión en cerrados y
+      en no cerrados; una dimensión con discriminación cercana a cero no aporta información, por
+      mucho peso que se le haya dado.`;
+  } else {
+    const banda = new Map(state.rows.map(r => [r.opportunity_id, r.banda]));
+    const porBanda = {};
+    for (const o of state.outcomes) {
+      const b = banda.get(o.opportunity_id) ?? 'NONE';
+      (porBanda[b] ??= {})[o.resultado] = ((porBanda[b] ?? {})[o.resultado] ?? 0) + 1;
+    }
+    const filas = orden.map(([k]) => {
+      const d = porBanda[k]; if (!d) return '';
+      const det = Object.entries(d)
+        .map(([r, n]) => `${n} ${(RES[r] ?? [r, r])[n === 1 ? 0 : 1]}`).join(', ');
+      return `<div class="bandrow"><span class="bl">${k === 'NONE' ? 'SIN PUNT.' : k}</span>
+        <span class="bn" style="text-align:left;flex:1">${esc(det)}</span></div>`;
+    }).join('');
+    convHtml = `${filas}<p class="empty-state" style="padding-bottom:0">
+      <span class="num">${conDesenlace}</span> desenlace${conDesenlace === 1 ? '' : 's'} registrado${conDesenlace === 1 ? '' : 's'}
+      de <span class="num">${state.rows.length}</span> expedientes, de los cuales
+      <span class="num">${cerrados}</span> ${cerrados === 1 ? 'es un cierre' : 'son cierres'}. Por debajo de 10 no hay tasa de conversión
+      que leer: esto es el recuento, no un resultado.</p>`;
+    discTxt = cerrados
+      ? `Hay ${cerrados} cierre${cerrados === 1 ? '' : 's'} registrado${cerrados === 1 ? '' : 's'}. El contraste por dimensión
+         necesita las puntuaciones de cada expediente cerrado frente a los no cerrados; todavía no
+         se calcula en esta superficie.`
+      : `Sin contraste posible. Hay ${conDesenlace} desenlace${conDesenlace === 1 ? '' : 's'} registrado${conDesenlace === 1 ? '' : 's'} y
+         ninguno es un cierre, así que no existe el grupo «cerrados» contra el que comparar.`;
+  }
 
   $('calGrid').innerHTML = `
     <div class="card"><h3>Distribución por banda</h3>
@@ -943,24 +1138,19 @@ function renderCalibracion() {
 
     <div class="card"><h3>Conversión por banda</h3>
       <p class="card-note">Si P1+P2 no convierten claramente por encima de P3+P4, el score no separa.</p>
-      <div class="empty-state">Sin datos. Ningún expediente tiene desenlace registrado
-        (<span class="num">${conDesenlace}</span> de <span class="num">${state.rows.length}</span>).<br />
-        <b style="color:var(--text);font-style:normal">Esta tarjeta no puede rellenarse desde el análisis:
-        exige el desenlace real de operaciones cerradas y abortadas.</b></div></div>
+      ${convHtml}</div>
 
     <div class="card"><h3>Muestra para recalibrar</h3>
       <p class="card-note">Expedientes con desenlace conocido frente al mínimo accionable.</p>
       <div class="gauge-track"><span class="gauge-fill" style="width:${Math.min(100, conDesenlace / 20 * 100)}%"></span></div>
-      <div class="gauge-ticks"><span>0 ACTUAL</span><span>10 ORIENTATIVO</span><span>20 ACCIONABLE</span></div>
+      <div class="gauge-ticks"><span>${conDesenlace} ACTUAL</span><span>10 ORIENTATIVO</span><span>20 ACCIONABLE</span></div>
       <p class="empty-state" style="padding-bottom:0">Por debajo de 10, los resultados son orientativos.
         Incluye siempre los que salieron mal y los que descartaste: un backtest hecho solo con éxitos
         es sesgo de supervivencia.</p></div>
 
     <div class="card"><h3>Poder discriminante</h3>
       <p class="card-note">Cuánto separa cada dimensión los expedientes que cerraron de los que no.</p>
-      <div class="empty-state">Sin datos. Se calcula como la diferencia entre la media de la dimensión
-        en cerrados y en no cerrados; una dimensión con discriminación cercana a cero no aporta
-        información, por mucho peso que se le haya dado.<br /><br />
+      <div class="empty-state">${discTxt}<br /><br />
         <b style="color:var(--text);font-style:normal">Primer contraste esperado:</b> el manual asigna a
         <i>Acceso al decisor</i> el mayor peso por su correlación empírica con el cierre. Es la primera
         hipótesis que el backtest debe confirmar o refutar.</div></div>`;
@@ -982,6 +1172,23 @@ function renderArquitectura() {
     `<div class="layer"><span class="layer-n">${n}</span><span class="layer-name">${nom}</span>
      <span class="layer-desc">${esc(desc)}</span>
      <span class="flag flag-${cls}">${esc(txt)}</span></div>`).join('');
+}
+
+// Pestanas del expediente. La ficha y el data room son el mismo objeto:
+// se alternan en el mismo sitio en vez de vivir en secciones distintas.
+function cablearPestanasExpediente() {
+  const tabs = $('dealTabs'); if (!tabs) return;
+  for (const b of tabs.querySelectorAll('[data-pane]')) {
+    b.addEventListener('click', () => {
+      for (const o of tabs.querySelectorAll('[data-pane]')) {
+        const activo = o === b;
+        o.setAttribute('aria-selected', String(activo));
+        o.setAttribute('aria-pressed', String(activo));
+        $(o.dataset.pane).hidden = !activo;
+      }
+    });
+    b.setAttribute('aria-pressed', b.getAttribute('aria-selected'));
+  }
 }
 
 function renderAll() { renderStats(); renderQueue(); renderFilters(); renderPipe(); renderDetail(); renderDataroom(); renderCalibracion(); renderArquitectura(); }
@@ -1043,6 +1250,7 @@ async function boot() {
   $('app').hidden = false;
   renderWhoami();
   wire();
+  cablearPestanasExpediente();
   try {
     await loadAll();
     if (!state.rows.length) banner('<b>SIN DATOS</b><br>La base responde pero no devuelve expedientes. Revisa que se haya aplicado la carga (05_seed.sql).');

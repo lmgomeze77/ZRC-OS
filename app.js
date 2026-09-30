@@ -1279,7 +1279,7 @@ function renderArquitectura() {
 // se alternan en el mismo sitio en vez de vivir en secciones distintas.
 // Hay dos mandos para lo mismo -- el del expediente y el de la barra fija --
 // asi que el estado vive aqui y los dos se repintan desde el.
-function abrirPanel(pane, irAlli = false) {
+function abrirPanel(pane, mover = false) {
   state.pane = pane;
   for (const grupo of ['dealTabs', 'dbSeg']) {
     const g = $(grupo); if (!g) continue;
@@ -1292,14 +1292,20 @@ function abrirPanel(pane, irAlli = false) {
   for (const id of ['detail', 'drPane']) {
     const el = $(id); if (el) el.hidden = (id !== pane);
   }
-  if (irAlli) $('pipeline')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  // Se lleva a la vista el EXPEDIENTE, no la seccion. #pipeline empieza por
+  // su titulo, la barra de filtros y la lista: saltar ahi dejaba el panel
+  // recien abierto entre 500 y 700 px por debajo de lo que se esta mirando,
+  // y habia que ir a buscarlo. Se mueve siempre que lo pida una persona --
+  // cambiar de panel sin mover deja la vista en un punto que ya no
+  // significa nada -- y nunca en el arranque.
+  if (mover) $('dealTabs')?.closest('.work-main')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 function cablearPestanasExpediente() {
   for (const grupo of ['dealTabs', 'dbSeg']) {
     const g = $(grupo); if (!g) continue;
     for (const b of g.querySelectorAll('[data-pane]')) {
-      b.addEventListener('click', () => abrirPanel(b.dataset.pane, grupo === 'dbSeg'));
+      b.addEventListener('click', () => abrirPanel(b.dataset.pane, true));
     }
   }
   // Desde el indice se entra directo al data room del expediente abierto.

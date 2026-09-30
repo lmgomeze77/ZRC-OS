@@ -365,8 +365,10 @@ table.pipe td { padding: 11px 12px; vertical-align: middle; font-size: 13.5px; }
 /* Con barra fija, saltar a una seccion deja su titulo debajo de la barra.
    El margen de anclaje reserva ese hueco para los enlaces del indice y
    para cualquier scrollIntoView. */
-section.section { scroll-margin-top: 66px; }
-@media (max-width: 560px) { section.section { scroll-margin-top: 92px; } }
+section.section, .work-main { scroll-margin-top: 66px; }
+@media (max-width: 560px) {
+  section.section, .work-main { scroll-margin-top: 92px; }
+}
 
 /* El indice lleva el data room en el color del data room. */
 .nav .nav-dr { color: var(--cyan); }

@@ -25,7 +25,7 @@ const state = {
   rubrics: [], gates: [], risk: [], doctError: null,
   outcomes: [], decisions: [], outError: null,
   miembros: [], accesos: [],
-  drTab: 'documentos',
+  drTab: 'documentos', pane: 'detail',
   selected: null, fVert: '', fBand: '', sortKey: 'score', sortDir: -1,
   draft: null
 };
@@ -1176,24 +1176,51 @@ function renderArquitectura() {
 
 // Pestanas del expediente. La ficha y el data room son el mismo objeto:
 // se alternan en el mismo sitio en vez de vivir en secciones distintas.
-function cablearPestanasExpediente() {
-  const tabs = $('dealTabs'); if (!tabs) return;
-  for (const b of tabs.querySelectorAll('[data-pane]')) {
-    b.addEventListener('click', () => {
-      for (const o of tabs.querySelectorAll('[data-pane]')) {
-        const activo = o === b;
-        o.setAttribute('aria-selected', String(activo));
-        o.setAttribute('aria-pressed', String(activo));
-        $(o.dataset.pane).hidden = !activo;
-      }
-    });
-    b.setAttribute('aria-pressed', b.getAttribute('aria-selected'));
+// Hay dos mandos para lo mismo -- el del expediente y el de la barra fija --
+// asi que el estado vive aqui y los dos se repintan desde el.
+function abrirPanel(pane, irAlli = false) {
+  state.pane = pane;
+  for (const grupo of ['dealTabs', 'dbSeg']) {
+    const g = $(grupo); if (!g) continue;
+    for (const b of g.querySelectorAll('[data-pane]')) {
+      const activo = b.dataset.pane === pane;
+      b.setAttribute('aria-selected', String(activo));
+      b.setAttribute('aria-pressed', String(activo));
+    }
   }
+  for (const id of ['detail', 'drPane']) {
+    const el = $(id); if (el) el.hidden = (id !== pane);
+  }
+  if (irAlli) $('pipeline')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
-function renderAll() { renderStats(); renderQueue(); renderFilters(); renderPipe(); renderDetail(); renderDataroom(); renderCalibracion(); renderArquitectura(); }
+function cablearPestanasExpediente() {
+  for (const grupo of ['dealTabs', 'dbSeg']) {
+    const g = $(grupo); if (!g) continue;
+    for (const b of g.querySelectorAll('[data-pane]')) {
+      b.addEventListener('click', () => abrirPanel(b.dataset.pane, grupo === 'dbSeg'));
+    }
+  }
+  // Desde el indice se entra directo al data room del expediente abierto.
+  $('navDr')?.addEventListener('click', (ev) => { ev.preventDefault(); abrirPanel('drPane', true); });
+  abrirPanel(state.pane);
+}
 
-function select(id) { state.selected = id; state.draft = null; renderPipe(); renderDetail(); renderDataroom(); $('detail').scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }
+// La barra solo tiene sentido con un expediente abierto.
+function renderDealBar() {
+  const bar = $('dealBar'); if (!bar) return;
+  const r = state.rows.find(x => x.opportunity_id === state.selected);
+  bar.hidden = !r;
+  if (!r) return;
+  $('dbName').textContent = r.nombre;
+  $('dbScore').textContent = r.dealscore == null
+    ? 'SIN PUNTUAR'
+    : `${Number(r.dealscore).toFixed(1)} · ${r.banda ?? ''}`.trim();
+}
+
+function renderAll() { renderStats(); renderQueue(); renderFilters(); renderPipe(); renderDetail(); renderDataroom(); renderCalibracion(); renderArquitectura(); renderDealBar(); }
+
+function select(id) { state.selected = id; state.draft = null; renderPipe(); renderDetail(); renderDataroom(); renderDealBar(); $('detail').scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }
 
 function wire() {
   $('pipeBody').addEventListener('click', e => { const tr = e.target.closest('tr[data-id]'); if (tr) select(tr.dataset.id); });

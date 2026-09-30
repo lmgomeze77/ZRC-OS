@@ -40,6 +40,13 @@
      rampa de oro y pasa a neutro. Ademas, #5E4D24 daba 2,23:1 sobre el
      panel -- por debajo del minimo de 3:1 y practicamente ilegible. */
   --b5: #6B7688;
+  /* Segundo acento, solo para el data room. El oro ya significa demasiadas
+     cosas (bandas, acciones, la firma), asi que los documentos piden un
+     color propio. Cian: separacion del oro de 18,2 (protan) y 20,3 en
+     vision normal, contraste 7,6:1 sobre el panel. Validado, no elegido
+     a ojo. No se toca el juego de estados (verde/ambar/rojo). */
+  --cyan: #4FB6D6;
+  --cyan-soft: rgba(79,182,214,.12);
 
   --mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
   --display: 'Cormorant Garamond', Georgia, 'Times New Roman', serif;
@@ -270,8 +277,8 @@ table.pipe td { padding: 11px 12px; vertical-align: middle; font-size: 13.5px; }
     gap: 18px; align-items: start;
   }
   .work-list {
-    position: sticky; top: 14px;
-    max-height: calc(100vh - 28px);
+    position: sticky; top: 72px;
+    max-height: calc(100vh - 86px);
     display: flex; flex-direction: column; min-height: 0;
   }
   .work-list .table-scroll { overflow: auto; flex: 1; min-height: 0; }
@@ -309,7 +316,62 @@ table.pipe td { padding: 11px 12px; vertical-align: middle; font-size: 13.5px; }
 
 /* El expediente con pestanas. El data room dejo de ser una seccion a mil
    pixeles de la ficha: es el mismo expediente, y se mira desde aqui. */
-.deal-tabs { display: flex; gap: 6px; align-items: center; margin-bottom: 12px; flex-wrap: wrap; }
+/* Control segmentado. Antes eran dos .tbtn sueltos heredados de la barra
+   de filtros: se leian como dos filtros, no como las dos caras de un
+   expediente. Ahora son un solo control, y el data room lleva su color. */
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 3px;
+  overflow: hidden; background: var(--panel-2); }
+.seg button {
+  font-family: var(--mono); font-size: 10.5px; font-weight: 700; letter-spacing: 1.2px;
+  text-transform: uppercase; padding: 11px 20px; background: none; border: none;
+  border-right: 1px solid var(--line); color: var(--muted); cursor: pointer;
+  transition: background .15s ease, color .15s ease;
+}
+.seg button:last-child { border-right: none; }
+.seg button:hover { color: var(--cream); background: rgba(201,168,76,.07); }
+.seg button[data-pane="drPane"] { color: var(--cyan); }
+.seg button[data-pane="drPane"]:hover { background: var(--cyan-soft); color: #9AD8EC; }
+.seg button[aria-selected="true"] { background: var(--gold); color: var(--bg); }
+.seg button[data-pane="drPane"][aria-selected="true"] { background: var(--cyan); color: var(--bg); }
+.seg-sm button { padding: 7px 13px; font-size: 9.5px; letter-spacing: 1px; }
+
+/* El panel del data room se tine del mismo acento, para que el color
+   signifique algo mas que decorar el boton. */
+#drPane { border-left-width: 3px; border-left-color: var(--cyan); }
+.dr-tabs .tbtn[aria-pressed="true"] { background: var(--cyan); border-color: var(--cyan); }
+
+/* Barra del expediente en curso, pegada arriba durante todo el scroll. */
+.dealbar {
+  position: sticky; top: 0; z-index: 40;
+  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  margin: 0 -24px 18px; padding: 10px 24px;
+  background: rgba(11,21,38,.94); backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--line);
+}
+.db-label { font-family: var(--mono); font-size: 8px; letter-spacing: 1.3px;
+  text-transform: uppercase; color: var(--faint); }
+.db-name { font-family: var(--serif); font-size: 15px; color: var(--cream);
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 44ch; }
+.db-score { font-family: var(--mono); font-size: 11px; letter-spacing: .8px; color: var(--muted); }
+.dealbar .seg { margin-left: auto; }
+@media (max-width: 560px) {
+  .dealbar { gap: 8px; padding: 8px 16px; margin: 0 -16px 14px; }
+  .db-label { display: none; }
+  .db-name { font-size: 13px; max-width: 100%; }
+  .dealbar .seg { margin-left: 0; width: 100%; }
+  .dealbar .seg button { flex: 1; text-align: center; padding: 9px 6px; }
+}
+
+/* Con barra fija, saltar a una seccion deja su titulo debajo de la barra.
+   El margen de anclaje reserva ese hueco para los enlaces del indice y
+   para cualquier scrollIntoView. */
+section.section { scroll-margin-top: 66px; }
+@media (max-width: 560px) { section.section { scroll-margin-top: 92px; } }
+
+/* El indice lleva el data room en el color del data room. */
+.nav .nav-dr { color: var(--cyan); }
+
+.deal-tabs { display: flex; gap: 10px; align-items: center; margin-bottom: 12px; flex-wrap: wrap; }
 .deal-ref { margin-left: auto; font-family: var(--mono); font-size: 9px;
   letter-spacing: 1.1px; color: var(--faint); text-transform: uppercase; }
 #drPane { border: 1px solid var(--line); background: var(--panel); padding: 20px; }
@@ -679,10 +741,25 @@ table.pipe td select.ck-est { background: var(--panel-2); border: 1px solid var(
       <a href="#estado">01 &middot; ESTADO</a>
       <a href="#pendientes">02 &middot; PENDIENTES</a>
       <a href="#pipeline">03 &middot; PIPELINE DEALSCORE</a>
-      <a href="#calibracion">04 &middot; CALIBRACI&Oacute;N</a>
-      <a href="#arquitectura">05 &middot; ARQUITECTURA</a>
+      <a href="#pipeline" class="nav-dr" id="navDr">04 &middot; DATA ROOM</a>
+      <a href="#calibracion">05 &middot; CALIBRACI&Oacute;N</a>
+      <a href="#arquitectura">06 &middot; ARQUITECTURA</a>
     </nav>
   </header>
+
+  <!-- Barra del expediente en curso. Se pega arriba durante todo el
+       desplazamiento: desde calibracion o arquitectura se sigue sabiendo
+       que expediente esta abierto, y se entra a su data room sin volver
+       a buscarlo en la lista. -->
+  <div class="dealbar" id="dealBar" hidden>
+    <span class="db-label">Expediente</span>
+    <span class="db-name" id="dbName"></span>
+    <span class="db-score" id="dbScore"></span>
+    <div class="seg seg-sm" id="dbSeg">
+      <button type="button" data-pane="detail">Puntuaci&oacute;n</button>
+      <button type="button" data-pane="drPane">Data room</button>
+    </div>
+  </div>
 
   <div id="banner"></div>
 
@@ -732,9 +809,11 @@ table.pipe td select.ck-est { background: var(--panel-2); border: 1px solid var(
         </div>
       </div>
       <div class="work-main">
-        <div class="deal-tabs" id="dealTabs" role="tablist">
-          <button class="tbtn" data-pane="detail" role="tab" aria-selected="true">Puntuaci&oacute;n y gobierno</button>
-          <button class="tbtn" data-pane="drPane" role="tab" aria-selected="false">Data room</button>
+        <div class="deal-tabs">
+          <div class="seg" id="dealTabs" role="tablist">
+            <button type="button" data-pane="detail" role="tab" aria-selected="true">Puntuaci&oacute;n y gobierno</button>
+            <button type="button" data-pane="drPane" role="tab" aria-selected="false">Data room</button>
+          </div>
           <span class="deal-ref" id="drRef">&mdash;</span>
         </div>
         <div class="detail" id="detail"></div>

@@ -606,6 +606,22 @@ table.pipe td select.ck-est { background: var(--panel-2); border: 1px solid var(
 .dec-cuando { font-family: var(--mono); font-size: 9px; color: var(--faint); margin-left: auto; }
 .dec-quien { color: var(--faint); font-size: 11.5px; }
 
+/* Abrir un fichero del cubo no es un enlace: es una peticion de URL
+   firmada. Se parece a un enlace porque hace lo mismo para el que mira. */
+.doc-abrir { background: none; border: none; padding: 0; cursor: pointer;
+  font-family: var(--mono); font-size: 9.5px; font-weight: 700; letter-spacing: 1.1px;
+  color: var(--cyan); text-transform: uppercase; }
+.doc-abrir:hover { color: #9AD8EC; text-decoration: underline; }
+.doc-meta { font-family: var(--mono); font-size: 8.5px; letter-spacing: .5px;
+  color: var(--faint); margin-top: 4px; }
+.fld input[type=file] {
+  background: var(--panel-2); border: 1px solid var(--line); border-radius: 2px;
+  color: var(--text); font-family: var(--mono); font-size: 10px; padding: 8px 10px; width: 100%; }
+.fld input[type=file]::file-selector-button {
+  background: var(--cyan); color: var(--bg); border: none; border-radius: 2px;
+  font-family: var(--mono); font-size: 9px; font-weight: 700; letter-spacing: 1px;
+  text-transform: uppercase; padding: 6px 12px; margin-right: 10px; cursor: pointer; }
+
 .doc .fila-acc { display: flex; justify-content: flex-end; }
 .frm-msg { margin-top: 11px; font-family: var(--mono); font-size: 9.5px;
   letter-spacing: .6px; min-height: 12px; }

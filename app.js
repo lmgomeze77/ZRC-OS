@@ -11,6 +11,16 @@ const SUPABASE_URL = 'https://jpecmcplicwhmtfnbpdi.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_i4NLV2qeu-QbhdzqHR9moQ_NvQC5T1O';
 const MODEL_ID     = 'dealscore-v1';
 
+// Ficheros del data room. El cubo es privado: no hay URL permanente, se
+// pide una firmada y con caducidad en el momento de abrir.
+const CUBO        = 'expedientes';
+const MAX_BYTES   = 25 * 1024 * 1024;
+const FIRMA_SEGS  = 60;
+// Lista blanca. Un data room recibe documentos, no ejecutables ni
+// archivos comprimidos cuyo contenido nadie ha mirado.
+const EXT_OK = ['pdf','doc','docx','xls','xlsx','ppt','pptx','csv','txt','rtf',
+                'png','jpg','jpeg','webp','heic'];
+
 const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 const $ = (id) => document.getElementById(id);
@@ -688,6 +698,15 @@ async function guardar(msgEl, btnEl, fn, textoOk = 'GUARDADO.') {
   }
 }
 
+// El nombre viaja a una ruta de almacenamiento: fuera acentos, espacios y
+// cualquier cosa que no sea segura en una URL.
+const nombreSeguro = (n) => n.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+  .replace(/[^A-Za-z0-9._-]+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '').slice(-80) || 'fichero';
+const extDe = (n) => (n.split('.').pop() ?? '').toLowerCase();
+const pesa = (b) => b == null ? '' : b < 1024 * 1024
+  ? `${Math.max(1, Math.round(b / 1024))} kB`
+  : `${(b / 1024 / 1024).toFixed(1)} MB`;
+
 const val = (id) => { const e = $(id); return e ? e.value.trim() : ''; };
 const num = (id) => { const v = val(id); return v === '' ? null : Number(v); };
 const chk = (id) => { const e = $(id); return e ? e.checked : false; };
@@ -727,11 +746,15 @@ function drDocumentos(id) {
         <article class="doc">
           <div><h4>${esc(d.titulo)}</h4>${d.descripcion ? `<p>${esc(d.descripcion)}</p>` : ''}</div>
           <div>
-            ${d.url
-              ? `<a href="${esc(d.url)}" target="_blank" rel="noopener">ABRIR DOCUMENTO</a>`
+            ${d.storage_path
+              ? `<button class="doc-abrir" data-abrir="${esc(d.storage_path)}">ABRIR FICHERO</button>
+                 <div class="doc-meta">${esc(d.nombre_fichero ?? '')}${d.bytes ? ' · ' + pesa(d.bytes) : ''}</div>`
+              : d.url
+              ? `<a href="${esc(d.url)}" target="_blank" rel="noopener">ABRIR ENLACE</a>`
               : `<div class="pend">▲ ${esc(String(d.estado).toUpperCase())}</div>`}
             ${canWrite() ? `<div class="fila-acc" style="margin-top:9px">
-              <button class="btn-mini" data-del-doc="${esc(d.id)}">ELIMINAR</button></div>` : ''}
+              <button class="btn-mini" data-del-doc="${esc(d.id)}"${
+                d.storage_path ? ` data-ruta="${esc(d.storage_path)}"` : ''}>ELIMINAR</button></div>` : ''}
           </div>
         </article>`).join('')}</div>`;
   }).join('') + formDocumento();
@@ -748,9 +771,15 @@ function formDocumento() {
       <div class="fld"><label for="dEst">Estado</label>
         <select id="dEst">${opciones({disponible:'Disponible',pendiente:'Pendiente',solicitado:'Solicitado'},'disponible')}</select></div>
       <div class="fld"><label for="dOrd">Orden</label><input id="dOrd" type="number" value="99" /></div>
-      <div class="fld ancho"><label for="dUrl">Enlace</label><input id="dUrl" type="text"
+      <div class="fld ancho"><label for="dFile">Fichero</label>
+        <input id="dFile" type="file" accept=".${EXT_OK.join(',.')}" />
+        <span class="pista">Sube el documento al cubo privado del expediente. Máximo 25 MB.
+          Admitidos: ${EXT_OK.join(', ').toUpperCase()}.</span></div>
+      <div class="fld ancho"><label for="dUrl">…o enlace externo</label><input id="dUrl" type="text"
         placeholder="https://drive.google.com/…" />
-        <span class="pista">Déjalo vacío si el documento aún no existe: se registra como hueco declarado.</span></div>
+        <span class="pista">Un documento es fichero <b>o</b> enlace, nunca las dos cosas: si lo fuera,
+          no habría forma de saber cuál es el bueno. Deja los dos vacíos si el documento aún no
+          existe y quieres registrarlo como hueco declarado.</span></div>
       <div class="fld ancho"><label for="dDes">Descripción</label><textarea id="dDes"></textarea></div>
     </div>
     <button class="btn-oro" id="dAdd">AÑADIR DOCUMENTO</button>
@@ -982,19 +1011,91 @@ function cablearChecklist() {
 function cablearFormularios(id) {
   const uid = () => sb.auth.getUser().then(r => r.data.user.id);
 
+  const noVale = (texto) => {
+    const m = $('dMsg'); m.className = 'frm-msg err'; m.textContent = texto;
+  };
+
   $('dAdd')?.addEventListener('click', async (ev) => {
-    if (!val('dTit')) { const m = $('dMsg'); m.className = 'frm-msg err'; m.textContent = 'EL TÍTULO ES OBLIGATORIO.'; return; }
+    if (!val('dTit')) return noVale('EL TÍTULO ES OBLIGATORIO.');
+    const fichero = $('dFile')?.files?.[0] ?? null;
+    const enlace  = val('dUrl') || null;
+
+    // Lo impone tambien la base (doc_una_sola_fuente), pero decirlo aqui
+    // evita un rechazo del driver con un mensaje ilegible.
+    if (fichero && enlace) return noVale('UN DOCUMENTO ES FICHERO O ENLACE, NO LAS DOS COSAS.');
+    if (fichero) {
+      if (fichero.size > MAX_BYTES)
+        return noVale(`EL FICHERO PESA ${pesa(fichero.size).toUpperCase()}. EL TOPE SON 25 MB.`);
+      if (!EXT_OK.includes(extDe(fichero.name)))
+        return noVale(`TIPO NO ADMITIDO (.${extDe(fichero.name).toUpperCase()}). SE ADMITEN: ${EXT_OK.join(', ').toUpperCase()}.`);
+    }
+
     const autor = await uid();
-    guardar($('dMsg'), ev.target, () => sb.from('documents').insert({
+    const base = {
       opportunity_id: id, titulo: val('dTit'), categoria: val('dCat'),
-      estado: val('dEst'), orden: num('dOrd') ?? 99,
-      url: val('dUrl') || null, descripcion: val('dDes') || null, anadido_por: autor
-    }), 'DOCUMENTO AÑADIDO.');
+      orden: num('dOrd') ?? 99, descripcion: val('dDes') || null, anadido_por: autor
+    };
+
+    if (!fichero) {
+      return guardar($('dMsg'), ev.target, () => sb.from('documents').insert({
+        ...base, estado: val('dEst'), url: enlace, storage_path: null
+      }), 'DOCUMENTO AÑADIDO.');
+    }
+
+    // La ruta empieza por el id del expediente: es lo que miran las
+    // politicas del cubo para heredar la reserva (app_ve_ruta).
+    const ruta = `${id}/${Date.now()}-${nombreSeguro(fichero.name)}`;
+    const m = $('dMsg'); m.className = 'frm-msg'; m.textContent = 'SUBIENDO…';
+    guardar($('dMsg'), ev.target, async () => {
+      const sub = await sb.storage.from(CUBO)
+        .upload(ruta, fichero, { contentType: fichero.type || undefined, upsert: false });
+      if (sub.error) return { error: sub.error };
+      const fila = await sb.from('documents').insert({
+        ...base, estado: 'disponible', url: null, storage_path: ruta,
+        nombre_fichero: fichero.name, bytes: fichero.size
+      });
+      // Si la fila no entra, el fichero se queda huerfano en el cubo:
+      // ocupa, no lo ve nadie y nadie sabe de quien era. Se retira.
+      if (fila.error) { await sb.storage.from(CUBO).remove([ruta]); return { error: fila.error }; }
+      return { error: null };
+    }, 'DOCUMENTO SUBIDO.');
   });
 
   for (const b of document.querySelectorAll('[data-del-doc]')) {
-    b.addEventListener('click', (ev) => guardar(null, ev.target,
-      () => sb.from('documents').delete().eq('id', b.dataset.delDoc)));
+    b.addEventListener('click', (ev) => {
+      const ruta = b.dataset.ruta || null;
+      if (ruta && !confirm('Esto borra también el fichero del cubo. Es irreversible.\n\n¿Seguir?')) return;
+      guardar(null, ev.target, async () => {
+        // Primero la fila. Al reves, un fallo dejaria un documento visible
+        // apuntando a un fichero que ya no existe, que es peor que un
+        // huerfano invisible.
+        const fila = await sb.from('documents').delete().eq('id', b.dataset.delDoc);
+        if (fila.error) return { error: fila.error };
+        if (ruta) return sb.storage.from(CUBO).remove([ruta]);
+        return { error: null };
+      });
+    });
+  }
+
+  // El cubo es privado: no hay enlace permanente. Se pide uno firmado y
+  // con caducidad justo al pulsar. La ventana se abre ANTES de esperar,
+  // porque abrirla despues la bloquea el navegador.
+  for (const b of document.querySelectorAll('[data-abrir]')) {
+    b.addEventListener('click', async () => {
+      // Sin el tercer argumento a proposito: con 'noopener' window.open
+      // devuelve null y el respaldo se llevaba por delante la pestaña
+      // actual, sacando al usuario del cuadro de mando. Se corta el
+      // vinculo despues, que consigue lo mismo sin perder el manejador.
+      const w = window.open('', '_blank');
+      const { data, error } = await sb.storage.from(CUBO)
+        .createSignedUrl(b.dataset.abrir, FIRMA_SEGS);
+      if (error || !data?.signedUrl) {
+        if (w) w.close();
+        return noVale('NO SE PUDO ABRIR: ' + String(error?.message ?? 'sin url').toUpperCase());
+      }
+      if (w) { w.opener = null; w.location = data.signedUrl; }
+      else noVale('EL NAVEGADOR HA BLOQUEADO LA VENTANA. PERMITE LAS EMERGENTES Y REINTENTA.');
+    });
   }
 
   $('eSave')?.addEventListener('click', (ev) => guardar($('eMsg'), ev.target,

@@ -935,6 +935,20 @@ const CK_PRIO = { critica:'Crítica', alta:'Alta', media:'Media' };
 const CK_ORIG = { informe_valoracion:'Informe valoración', cuaderno:'Cuaderno',
                   valoracion:'Valoración', dd_recomendada:'DD recomendada' };
 
+// El documento que cierra el punto, abrible desde aqui. Si la columna
+// todavia no existe en la base, c.document_id llega undefined y esto no
+// pinta nada: la pantalla no se cae por una migracion sin aplicar.
+function docDelPunto(c) {
+  if (!c.document_id) return '';
+  const d = state.docs.find(x => x.id === c.document_id);
+  if (!d) return '';
+  const abrir = d.storage_path
+    ? `<button class="doc-abrir" data-abrir="${esc(d.storage_path)}">ABRIR</button>`
+    : d.url ? `<a href="${esc(d.url)}" target="_blank" rel="noopener">ABRIR</a>`
+    : `<span class="td-code">${esc(String(d.estado).toUpperCase())}</span>`;
+  return `<div class="ck-doc">◆ ${esc(d.titulo)} ${abrir}</div>`;
+}
+
 function drChecklist(id) {
   const todos = state.check.filter(c => c.opportunity_id === id);
   if (!todos.length) return vacio('Sin checklist de preparación para este expediente.');
@@ -967,6 +981,7 @@ function drChecklist(id) {
           c.responsable ? ` · <span class="ck-resp">${esc(c.responsable)}</span>` : ''}</div>
         <div style="font-size:13px;color:var(--text);margin-top:3px">${esc(c.descripcion)}</div>
         ${c.nota ? `<div class="ck-nota">${esc(c.nota)}</div>` : ''}
+        ${docDelPunto(c)}
         ${canWrite() ? `<button class="ck-edit" data-ck-edit="${esc(c.id)}">${
           c.nota ? 'EDITAR RESPUESTA' : '+ RESPUESTA'}</button>` : ''}</td>
     <td><span class="pill p-${esc(c.prioridad)}">${esc(CK_PRIO[c.prioridad] ?? c.prioridad)}</span></td>
@@ -981,6 +996,12 @@ function drChecklist(id) {
         <textarea id="ckn-${esc(c.id)}" placeholder="La cifra, el hallazgo o el documento que responde a este punto.">${esc(c.nota ?? '')}</textarea></div>
       <div class="fld"><label for="ckr-${esc(c.id)}">Responsable</label>
         <input id="ckr-${esc(c.id)}" type="text" value="${esc(c.responsable ?? '')}" placeholder="Quién lo persigue" /></div>
+      <div class="fld"><label for="ckd-${esc(c.id)}">Documento que lo resuelve</label>
+        <select id="ckd-${esc(c.id)}">
+          <option value="">— ninguno —</option>
+          ${state.docs.filter(d => d.opportunity_id === c.opportunity_id).map(d =>
+            `<option value="${esc(d.id)}"${d.id === c.document_id ? ' selected' : ''}>${esc(d.titulo)}</option>`).join('')}
+        </select></div>
       <div class="fld"><label>&nbsp;</label>
         <button class="btn-oro" style="margin-top:0" data-ck-save="${esc(c.id)}">GUARDAR</button></div>
     </div>
@@ -1062,6 +1083,7 @@ function renderDataroom() {
   const fn = (DR_TABS.find(([k]) => k === state.drTab) ?? DR_TABS[0])[2];
   $('drBody').innerHTML = fn(r.opportunity_id);
   cablearChecklist(r.opportunity_id);
+  cablearAperturas();
   if (canWrite()) cablearFormularios(r.opportunity_id);
 }
 
@@ -1091,6 +1113,7 @@ function cablearChecklist(id) {
       guardar($('ckm-' + k), ev.target, () => sb.from('checklist_items').update({
         nota: val('ckn-' + k) || null,
         responsable: val('ckr-' + k) || null,
+        document_id: val('ckd-' + k) || null,
         actualizado_en: new Date().toISOString()
       }).eq('id', k), 'RESPUESTA GUARDADA.');
     });
@@ -1200,6 +1223,17 @@ function cablearFormularios(id) {
     });
   }
 
+}
+
+// Abrir ficheros NO es una accion de escritura. Vivia dentro de
+// cablearFormularios(), que solo corre para quien puede editar, asi que
+// un lector veia el boton y no hacia nada -- cuando las politicas del
+// cubo si le dejan leer. Se cablea para todos.
+function cablearAperturas() {
+  const noVale = (texto) => {
+    const m = $('dMsg'); if (!m) return alert(texto);
+    m.className = 'frm-msg err'; m.textContent = texto;
+  };
   // El cubo es privado: no hay enlace permanente. Se pide uno firmado y
   // con caducidad justo al pulsar. La ventana se abre ANTES de esperar,
   // porque abrirla despues la bloquea el navegador.

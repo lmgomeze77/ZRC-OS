@@ -632,6 +632,17 @@ table.pipe td select.ck-est { background: var(--panel-2); border: 1px solid var(
   font-family: var(--mono); font-size: 9px; font-weight: 700; letter-spacing: 1px;
   text-transform: uppercase; padding: 6px 12px; margin-right: 10px; cursor: pointer; }
 
+/* Respuesta de un punto del checklist. Se lee con el punto, no en un
+   dialogo aparte: la casilla sin lo que se encontro no es memoria. */
+.ck-nota { margin-top: 6px; padding: 7px 10px; border-left: 2px solid var(--cyan);
+  background: var(--cyan-soft); font-size: 12.5px; color: var(--text); line-height: 1.5; }
+.ck-resp { color: var(--gold); }
+.ck-edit { margin-top: 6px; background: none; border: none; padding: 0; cursor: pointer;
+  font-family: var(--mono); font-size: 8px; font-weight: 700; letter-spacing: 1px;
+  text-transform: uppercase; color: var(--muted); }
+.ck-edit:hover { color: var(--cyan); }
+.ck-fila-edit > td { background: var(--panel-2); padding: 14px 12px !important; }
+
 .doc .fila-acc { display: flex; justify-content: flex-end; }
 .frm-msg { margin-top: 11px; font-family: var(--mono); font-size: 9.5px;
   letter-spacing: .6px; min-height: 12px; }

@@ -959,20 +959,65 @@ function drChecklist(id) {
       <div class="ck-bar"><i style="width:${pct}%"></i></div></div>
   </div>`;
 
+  // La respuesta se enseña SIEMPRE, tambien a los lectores: un punto
+  // validado sin lo que se encontro no es memoria, es una casilla.
   const filas = vis.map(c => `<tr>
     <td><span class="ck-num">${String(c.orden).padStart(2,'0')}</span></td>
-    <td><div class="ck-area">${esc(c.area)}</div>
-        <div style="font-size:13px;color:var(--text);margin-top:3px">${esc(c.descripcion)}</div></td>
+    <td><div class="ck-area">${esc(c.area)}${
+          c.responsable ? ` · <span class="ck-resp">${esc(c.responsable)}</span>` : ''}</div>
+        <div style="font-size:13px;color:var(--text);margin-top:3px">${esc(c.descripcion)}</div>
+        ${c.nota ? `<div class="ck-nota">${esc(c.nota)}</div>` : ''}
+        ${canWrite() ? `<button class="ck-edit" data-ck-edit="${esc(c.id)}">${
+          c.nota ? 'EDITAR RESPUESTA' : '+ RESPUESTA'}</button>` : ''}</td>
     <td><span class="pill p-${esc(c.prioridad)}">${esc(CK_PRIO[c.prioridad] ?? c.prioridad)}</span></td>
     <td><span class="td-code">${esc(CK_ORIG[c.origen] ?? c.origen)}</span></td>
     <td>${canWrite()
       ? `<select class="ck-est e-${esc(c.estado)}" data-ck="${esc(c.id)}">${opc(CK_EST, c.estado)}</select>`
       : `<span class="td-code e-${esc(c.estado)}">${esc(CK_EST[c.estado] ?? c.estado)}</span>`}</td>
-  </tr>`).join('');
+  </tr>
+  ${canWrite() ? `<tr class="ck-fila-edit" id="cke-${esc(c.id)}" hidden><td colspan="5">
+    <div class="frm-grid">
+      <div class="fld ancho"><label for="ckn-${esc(c.id)}">Respuesta · qué se ha encontrado</label>
+        <textarea id="ckn-${esc(c.id)}" placeholder="La cifra, el hallazgo o el documento que responde a este punto.">${esc(c.nota ?? '')}</textarea></div>
+      <div class="fld"><label for="ckr-${esc(c.id)}">Responsable</label>
+        <input id="ckr-${esc(c.id)}" type="text" value="${esc(c.responsable ?? '')}" placeholder="Quién lo persigue" /></div>
+      <div class="fld"><label>&nbsp;</label>
+        <button class="btn-oro" style="margin-top:0" data-ck-save="${esc(c.id)}">GUARDAR</button></div>
+    </div>
+    <div class="frm-msg" id="ckm-${esc(c.id)}"></div></td></tr>` : ''}`).join('');
 
   return cab + `<div class="table-scroll"><table class="pipe"><thead><tr>
     <th>#</th><th>Área · documento o información</th><th>Prioridad</th><th>Origen</th><th>Estado</th>
-  </tr></thead><tbody>${filas}</tbody></table></div>`;
+  </tr></thead><tbody>${filas}</tbody></table></div>` + formChecklist(todos);
+}
+
+// Dar de alta un punto. El checklist que trae el expediente es el de la
+// due diligence estandar; lo que aparece durante el proceso -- una pregunta
+// del comprador, un hallazgo -- tambien es exigencia y tiene que caber.
+function formChecklist(todos) {
+  if (!canWrite()) return '';
+  const siguiente = todos.reduce((m, c) => Math.max(m, c.orden), 0) + 1;
+  const areas = [...new Set(todos.map(c => c.area))].sort();
+  return `<div class="frm">
+    <h4>Añadir punto al checklist</h4>
+    <div class="frm-grid">
+      <div class="fld"><label for="ckNArea">Área</label>
+        <input id="ckNArea" type="text" list="ckAreas" placeholder="Financiero, Legal…" />
+        <datalist id="ckAreas">${areas.map(a => `<option value="${esc(a)}"></option>`).join('')}</datalist></div>
+      <div class="fld"><label for="ckNPrio">Prioridad</label>
+        <select id="ckNPrio">${Object.entries(CK_PRIO).map(([k,t]) =>
+          `<option value="${esc(k)}"${k==='alta'?' selected':''}>${esc(t)}</option>`).join('')}</select></div>
+      <div class="fld"><label for="ckNOrig">Origen</label>
+        <select id="ckNOrig">${Object.entries(CK_ORIG).map(([k,t]) =>
+          `<option value="${esc(k)}">${esc(t)}</option>`).join('')}</select></div>
+      <div class="fld"><label for="ckNOrd">Nº</label>
+        <input id="ckNOrd" type="number" value="${siguiente}" /></div>
+      <div class="fld ancho"><label for="ckNDes">Documento o información que se exige</label>
+        <textarea id="ckNDes" placeholder="Qué hay que pedir, con el detalle suficiente para que no haya que preguntarlo dos veces."></textarea></div>
+    </div>
+    <button class="btn-oro" id="ckNAdd">AÑADIR PUNTO</button>
+    <div class="frm-msg" id="ckNMsg"></div>
+  </div>`;
 }
 
 const DR_TABS = [
@@ -1016,11 +1061,11 @@ function renderDataroom() {
 
   const fn = (DR_TABS.find(([k]) => k === state.drTab) ?? DR_TABS[0])[2];
   $('drBody').innerHTML = fn(r.opportunity_id);
-  cablearChecklist();
+  cablearChecklist(r.opportunity_id);
   if (canWrite()) cablearFormularios(r.opportunity_id);
 }
 
-function cablearChecklist() {
+function cablearChecklist(id) {
   $('ckPrio')?.addEventListener('change', function () { state.ckPrio = this.value; renderDataroom(); });
   $('ckEst') ?.addEventListener('change', function () { state.ckEst  = this.value; renderDataroom(); });
   for (const sel of document.querySelectorAll('.ck-est')) {
@@ -1029,6 +1074,45 @@ function cablearChecklist() {
         estado: sel.value, actualizado_en: new Date().toISOString()
       }).eq('id', sel.dataset.ck)));
   }
+
+  // La fila de respuesta se despliega bajo su punto. No es un dialogo
+  // aparte: lo que se escribe pertenece a ese punto y se lee con el.
+  for (const b of document.querySelectorAll('[data-ck-edit]')) {
+    b.addEventListener('click', () => {
+      const fila = $('cke-' + b.dataset.ckEdit);
+      fila.hidden = !fila.hidden;
+      if (!fila.hidden) $('ckn-' + b.dataset.ckEdit)?.focus();
+    });
+  }
+
+  for (const b of document.querySelectorAll('[data-ck-save]')) {
+    b.addEventListener('click', (ev) => {
+      const k = b.dataset.ckSave;
+      guardar($('ckm-' + k), ev.target, () => sb.from('checklist_items').update({
+        nota: val('ckn-' + k) || null,
+        responsable: val('ckr-' + k) || null,
+        actualizado_en: new Date().toISOString()
+      }).eq('id', k), 'RESPUESTA GUARDADA.');
+    });
+  }
+
+  $('ckNAdd')?.addEventListener('click', (ev) => {
+    const m = $('ckNMsg');
+    if (!val('ckNDes')) {
+      m.className = 'frm-msg err';
+      m.textContent = 'DI QUÉ SE EXIGE: UN PUNTO SIN DESCRIPCIÓN NO SE PUEDE PEDIR.';
+      return;
+    }
+    if (!val('ckNArea')) {
+      m.className = 'frm-msg err';
+      m.textContent = 'EL ÁREA ES OBLIGATORIA: ES LO QUE AGRUPA EL CHECKLIST.';
+      return;
+    }
+    guardar(m, ev.target, () => sb.from('checklist_items').insert({
+      opportunity_id: id, orden: num('ckNOrd'), area: val('ckNArea'),
+      descripcion: val('ckNDes'), prioridad: val('ckNPrio'), origen: val('ckNOrig')
+    }), 'PUNTO AÑADIDO.');
+  });
 }
 
 function cablearFormularios(id) {

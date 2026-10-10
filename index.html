@@ -13,9 +13,16 @@
 
 
 :root {
-  --bg: #060D18;
-  --panel: #0B1526;
-  --panel-2: #0E1A2E;
+  /* El fondo era casi negro (#060D18, luminancia 0,0039) y los paneles
+     apenas se despegaban de el: el data room se leia como un vacio, no
+     como una superficie de trabajo. Azul mas saturado y un escalon mas
+     claro, con los saltos de elevacion medidos: fondo→panel 1,75x y
+     panel→panel-2 1,56x. Comprobado que los once colores de primer plano
+     siguen por encima de 3:1 sobre el panel nuevo; el mas justo es
+     DESCARTE, a 3,68:1. */
+  --bg: #081426;
+  --panel: #0E1D33;
+  --panel-2: #14263F;
   --raise: #12203a;
   --gold: #C9A84C;
   --gold-soft: rgba(201,168,76,.14);

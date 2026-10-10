@@ -35,7 +35,7 @@ const state = {
   rubrics: [], gates: [], risk: [], doctError: null,
   outcomes: [], decisions: [], outError: null,
   miembros: [], accesos: [],
-  drTab: 'documentos', pane: 'detail', docQ: '', docCat: '', ckPlazo: '',
+  drTab: 'documentos', pane: 'detail', docQ: '', docCat: '', ckPlazo: '', hoyTab: '', nombre: null,
   selected: null, fVert: '', fBand: '', sortKey: 'score', sortDir: -1,
   draft: null
 };
@@ -278,6 +278,87 @@ const pastillaReloj = (f) => {
   const r = reloj(f);
   return r ? `<span class="reloj r-${r.clase}">${esc(r.texto)}</span>` : '';
 };
+
+// ── HOY ─────────────────────────────────────────────────────────────
+// La cola de Pendientes responde "que es lo siguiente para la firma",
+// por la jerarquia del SOP-08. Esto responde otra pregunta distinta:
+// "que me toca a mi, hoy". Mismos datos, otra lente. No duplica la
+// fuente: los puntos de checklist salen de state.check y de la cola
+// solo lo que no es checklist, para que nada aparezca dos veces.
+function trabajoDeHoy() {
+  const nombreDe = (oid) => state.rows.find(r => r.opportunity_id === oid)?.nombre ?? '—';
+  const yo = (state.nombre ?? '').trim().toLowerCase();
+
+  const deLaCola = state.pend
+    .filter(it => it.motivo !== 'checklist_vencido' && it.vence_en)
+    .map(it => ({ oid: it.opportunity_id, expediente: it.nombre,
+                  que: it.detalle ?? (MOTIVO[it.motivo]?.[0] ?? it.motivo),
+                  etiqueta: MOTIVO[it.motivo]?.[0] ?? it.motivo,
+                  vence: it.vence_en, mio: false }));
+
+  const delChecklist = state.check
+    .filter(c => c.estado !== 'validado')
+    .map(c => ({ oid: c.opportunity_id, expediente: nombreDe(c.opportunity_id),
+                 que: `${c.area} · ${c.descripcion}`, etiqueta: 'Checklist',
+                 vence: c.vence_en,
+                 mio: !!(yo && (c.responsable ?? '').trim().toLowerCase() === yo) }))
+    .filter(c => c.vence || c.mio);
+
+  return [...deLaCola, ...delChecklist];
+}
+
+function renderHoy() {
+  const caja = $('hoy'); if (!caja) return;
+  const todo = trabajoDeHoy();
+  const esVencido = (t) => (reloj(t.vence)?.dias ?? 9e3) < 0;
+  const esSemana  = (t) => { const d = reloj(t.vence)?.dias; return d != null && d >= 0 && d <= 7; };
+
+  const grupos = {
+    vencido: todo.filter(esVencido),
+    semana:  todo.filter(esSemana),
+    mio:     todo.filter(t => t.mio)
+  };
+  // Se abre por lo que arde: si no hay vencido, por lo de esta semana.
+  if (!state.hoyTab) state.hoyTab = grupos.vencido.length ? 'vencido'
+    : grupos.semana.length ? 'semana' : 'mio';
+
+  const chip = (k, t) => `<button type="button" class="tbtn" data-hoy="${k}"
+    aria-pressed="${state.hoyTab === k}">${t} · ${grupos[k].length}</button>`;
+
+  const lista = [...grupos[state.hoyTab]]
+    .sort((a,b) => (reloj(a.vence)?.dias ?? 9e3) - (reloj(b.vence)?.dias ?? 9e3));
+
+  $('hoyRef').textContent = grupos.vencido.length
+    ? `${grupos.vencido.length} VENCIDO${grupos.vencido.length === 1 ? '' : 'S'}`
+    : 'AL DÍA';
+  $('hoyRef').className = 'sec-ref' + (grupos.vencido.length ? ' es-vencido' : '');
+
+  caja.innerHTML = `<div class="hoy-tabs">
+      ${chip('vencido','Vencido')}${chip('semana','Esta semana')}${chip('mio','A mi nombre')}
+    </div>` + (lista.length
+    ? `<div class="hoy-lista">${lista.map(t => `
+        <div class="hoy-fila" data-goto="${esc(t.oid)}" role="button" tabindex="0">
+          <span class="hoy-exp">${esc(t.expediente)}</span>
+          <span class="hoy-que">${esc(t.que)}</span>
+          <span class="hoy-eti">${esc(t.etiqueta)}</span>
+          ${t.mio ? '<span class="hoy-mio">MÍO</span>' : ''}
+          ${pastillaReloj(t.vence) || '<span class="td-code">sin fecha</span>'}
+        </div>`).join('')}</div>`
+    : `<div class="empty-state">${
+        state.hoyTab === 'mio'
+          ? (state.nombre
+             ? `Nada a nombre de <b style="color:var(--text)">${esc(state.nombre)}</b>. El responsable se pone en la respuesta de cada punto del checklist.`
+             : 'Tu cuenta no tiene nombre en app_members, así que no se puede saber qué es tuyo.')
+          : 'Nada en este tramo.'}</div>`);
+
+  for (const b of caja.querySelectorAll('[data-hoy]'))
+    b.addEventListener('click', () => { state.hoyTab = b.dataset.hoy; renderHoy(); });
+  for (const f of caja.querySelectorAll('[data-goto]')) {
+    const ir = () => select(f.dataset.goto);
+    f.addEventListener('click', ir);
+    f.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); ir(); } });
+  }
+}
 
 function renderQueue() {
   // Dentro de la misma prioridad manda el reloj: lo vencido primero, y
@@ -1570,7 +1651,7 @@ function renderDealBar() {
     : `${Number(r.dealscore).toFixed(1)} · ${r.banda ?? ''}`.trim();
 }
 
-function renderAll() { renderStats(); renderQueue(); renderFilters(); renderPipe(); renderDetail(); renderDataroom(); renderCalibracion(); renderArquitectura(); renderDealBar(); }
+function renderAll() { renderStats(); renderHoy(); renderQueue(); renderFilters(); renderPipe(); renderDetail(); renderDataroom(); renderCalibracion(); renderArquitectura(); renderDealBar(); }
 
 function select(id) { state.selected = id; state.draft = null; renderPipe(); renderDetail(); renderDataroom(); renderDealBar(); $('detail').scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }
 

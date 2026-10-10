@@ -659,6 +659,28 @@ table.pipe td select.ck-est { background: var(--panel-2); border: 1px solid var(
 .ck-resp { color: var(--gold); }
 /* El reloj. Vencido usa el rojo de estado, que es exactamente lo que
    es, y nunca se queda en color solo: lleva siempre su texto. */
+/* La bandeja de hoy. Filas densas, una linea por cosa: es para mirarla
+   de pasada y decidir, no para leerla. */
+.hoy-tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+.hoy-lista { display: flex; flex-direction: column; gap: 1px;
+  background: var(--line-2); border: 1px solid var(--line-2); }
+.hoy-fila { background: var(--panel); padding: 11px 14px; cursor: pointer;
+  display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.hoy-fila:hover { background: var(--panel-2); }
+.hoy-exp { font-family: var(--serif); font-size: 14px; color: var(--cream);
+  min-width: 190px; max-width: 28ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hoy-que { font-size: 13px; color: var(--text); flex: 1; min-width: 200px; }
+.hoy-eti { font-family: var(--mono); font-size: 8px; letter-spacing: 1px;
+  text-transform: uppercase; color: var(--faint); }
+.hoy-mio { font-family: var(--mono); font-size: 8px; font-weight: 700; letter-spacing: 1px;
+  color: var(--bg); background: var(--gold); padding: 2px 5px; border-radius: 2px; }
+.sec-ref.es-vencido { color: var(--red); }
+@media (max-width: 560px) {
+  .hoy-fila { gap: 7px; }
+  .hoy-exp { min-width: 100%; max-width: 100%; }
+  .hoy-que { min-width: 100%; }
+}
+
 .reloj { font-family: var(--mono); font-size: 8px; font-weight: 700; letter-spacing: .9px;
   padding: 2px 6px; border: 1px solid; border-radius: 2px; white-space: nowrap; }
 .reloj.r-vencido { color: var(--red);   border-color: rgba(248,113,113,.45); background: rgba(248,113,113,.08); }
@@ -810,12 +832,13 @@ table.pipe td select.ck-est { background: var(--panel-2); border: 1px solid var(
       </div>
     </div>
     <nav class="nav">
-      <a href="#estado">01 &middot; ESTADO</a>
-      <a href="#pendientes">02 &middot; PENDIENTES</a>
-      <a href="#pipeline">03 &middot; PIPELINE DEALSCORE</a>
-      <a href="#pipeline" class="nav-dr" id="navDr">04 &middot; DATA ROOM</a>
-      <a href="#calibracion">05 &middot; CALIBRACI&Oacute;N</a>
-      <a href="#arquitectura">06 &middot; ARQUITECTURA</a>
+      <a href="#hoy-sec">01 &middot; HOY</a>
+      <a href="#estado">02 &middot; ESTADO</a>
+      <a href="#pendientes">03 &middot; PENDIENTES</a>
+      <a href="#pipeline">04 &middot; PIPELINE DEALSCORE</a>
+      <a href="#pipeline" class="nav-dr" id="navDr">05 &middot; DATA ROOM</a>
+      <a href="#calibracion">06 &middot; CALIBRACI&Oacute;N</a>
+      <a href="#arquitectura">07 &middot; ARQUITECTURA</a>
     </nav>
   </header>
 
@@ -834,6 +857,17 @@ table.pipe td select.ck-est { background: var(--panel-2); border: 1px solid var(
   </div>
 
   <div id="banner"></div>
+
+  <section class="section" id="hoy-sec">
+    <div class="sec-head"><h2 class="sec-title">Hoy</h2>
+      <span class="sec-ref" id="hoyRef">&mdash;</span></div>
+    <p class="sec-note" style="margin-bottom:14px">
+      Lo que vence, lo que viene esta semana y lo que est&aacute; a tu nombre, de todos
+      los expedientes a la vez. Pendientes responde qu&eacute; es lo siguiente para la
+      firma; esto responde qu&eacute; te toca a ti.
+    </p>
+    <div id="hoy"></div>
+  </section>
 
   <section class="section" id="estado">
     <div class="sec-head"><h2 class="sec-title">Estado de la firma</h2>

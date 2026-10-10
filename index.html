@@ -7,7 +7,7 @@
 <title>ZRC OS</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=Source+Serif+4:ital,wght@0,300;0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
 <style>
 
 
@@ -20,29 +20,29 @@
      panel→panel-2 1,56x. Comprobado que los once colores de primer plano
      siguen por encima de 3:1 sobre el panel nuevo; el mas justo es
      DESCARTE, a 3,68:1. */
-  --bg: #081426;
-  --panel: #0E1D33;
-  --panel-2: #14263F;
-  --raise: #12203a;
-  --gold: #C9A84C;
-  --gold-soft: rgba(201,168,76,.14);
-  --cream: #E8DCC8;
-  --text: #A5B4C8;
-  --muted: #5A6A80;
-  --faint: #344156;
-  --line: rgba(201,168,76,.12);
-  --line-2: rgba(165,180,200,.10);
+  --bg: #EDF1F7;
+  --panel: #FFFFFF;
+  --panel-2: #F5F8FC;
+  --raise: #E7EDF5;
+  --gold: #8A6D1F;
+  --gold-soft: rgba(138,109,31,.10);
+  --cream: #0F1C2E;
+  --text: #33445C;
+  --muted: #5B6B82;
+  --faint: #73839B;
+  --line: rgba(15,28,46,.12);
+  --line-2: rgba(15,28,46,.09);
 
   
-  --green: #34D399;
-  --amber: #FBBF24;
-  --red: #F87171;
+  --green: #047857;
+  --amber: #B45309;
+  --red: #B91C1C;
 
   
-  --b1: #F0D486;
-  --b2: #D9B65C;
-  --b3: #B8933C;
-  --b4: #8A6E2E;
+  --b1: #5A4410;
+  --b2: #7A5F18;
+  --b3: #967829;
+  --b4: #B19036;
   /* DESCARTE no es "la banda mas baja": es un estado terminal. Sale de la
      rampa de oro y pasa a neutro. Ademas, #5E4D24 daba 2,23:1 sobre el
      panel -- por debajo del minimo de 3:1 y practicamente ilegible. */
@@ -52,12 +52,27 @@
      color propio. Cian: separacion del oro de 18,2 (protan) y 20,3 en
      vision normal, contraste 7,6:1 sobre el panel. Validado, no elegido
      a ojo. No se toca el juego de estados (verde/ambar/rojo). */
-  --cyan: #4FB6D6;
-  --cyan-soft: rgba(79,182,214,.12);
+  --cyan: #0E7490;
+  --cyan-soft: rgba(14,116,144,.09);
+  --cyan-hi: #075E70;
+  /* Tokens que faltaban y clavaban el tema oscuro: el fondo de la barra
+     fija y el surco vacio de las barras. Con un fondo claro, un rgba de
+     navy al 94% deja una franja negra, y un gris al 10% no se ve. */
+  --barra: rgba(255,255,255,.93);
+  --track: rgba(15,28,46,.11);
+  /* Enfasis. --linea-fuerte es la regla que cierra una cabecera de
+     seccion: la linea normal al 12% separa, pero no jerarquiza. --gold-hi
+     es el oro de hover, que sobre claro tiene que OSCURECER (en el tema
+     oscuro aclaraba). --gold-line es el unico borde de oro que se ve
+     sobre blanco: el oro al 40% daba 1,1:1 contra el panel. */
+  --linea-fuerte: rgba(15,28,46,.20);
+  --gold-hi: #6B5312;
+  --gold-line: rgba(138,109,31,.45);
+  --wash: rgba(15,28,46,.035);
 
   --mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
-  --display: 'Cormorant Garamond', Georgia, 'Times New Roman', serif;
-  --body: 'Source Serif 4', Georgia, 'Times New Roman', serif;
+  --display: 'Fraunces', Georgia, serif;
+  --body: 'Inter', -apple-system, system-ui, sans-serif;
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -65,7 +80,7 @@ html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
 
 body {
   background:
-    radial-gradient(circle at 50% -8%, rgba(201,168,76,.06), transparent 38%),
+    radial-gradient(circle at 50% -8%, rgba(138,109,31,.06), transparent 38%),
     var(--bg);
   color: var(--text);
   font-family: var(--body);
@@ -78,10 +93,10 @@ body {
 button, input, select { font: inherit; color: inherit; }
 button { background: none; border: none; cursor: pointer; }
 :focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; border-radius: 2px; }
-::selection { background: rgba(201,168,76,.25); color: var(--cream); }
+::selection { background: rgba(138,109,31,.18); color: var(--cream); }
 ::-webkit-scrollbar { width: 7px; height: 7px; }
 ::-webkit-scrollbar-track { background: var(--bg); }
-::-webkit-scrollbar-thumb { background: rgba(201,168,76,.22); border-radius: 4px; }
+::-webkit-scrollbar-thumb { background: rgba(138,109,31,.28); border-radius: 4px; }
 
 .shell { max-width: 1120px; margin: 0 auto; padding-left: 24px; padding-right: 24px; }
 /* En pantalla de trabajo el ancho de lectura deja de mandar: manda el area
@@ -107,7 +122,7 @@ button { background: none; border: none; cursor: pointer; }
 }
 .live-dot {
   width: 7px; height: 7px; border-radius: 50%; background: var(--green);
-  box-shadow: 0 0 8px rgba(52,211,153,.45); display: inline-block;
+  box-shadow: 0 0 8px rgba(4,120,87,.45); display: inline-block;
   vertical-align: middle; animation: pulse 2.4s ease infinite;
 }
 @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .4; } }
@@ -134,8 +149,8 @@ button { background: none; border: none; cursor: pointer; }
 
 .govern {
   margin-top: 22px; padding: 16px 18px;
-  border: 1px solid rgba(251,191,36,.3); border-left: 3px solid var(--amber);
-  background: rgba(251,191,36,.05);
+  border: 1px solid rgba(180,83,9,.3); border-left: 3px solid var(--amber);
+  background: rgba(180,83,9,.05);
 }
 .govern-head {
   display: flex; align-items: center; gap: 9px; margin-bottom: 7px;
@@ -146,28 +161,42 @@ button { background: none; border: none; cursor: pointer; }
 .govern p + p { margin-top: 8px; }
 .govern code {
   font-family: var(--mono); font-size: 12px; color: var(--cream);
-  background: rgba(201,168,76,.10); padding: 1px 5px; border-radius: 2px;
+  background: var(--gold-soft); padding: 1px 5px; border-radius: 2px;
 }
 
-.section { padding-block: 40px 0; }
+.section { box-shadow: none; }
+.stat, .q-item, .detail, #drPane, .hoy-lista, .table-scroll, .card, .layer, .frm {
+  box-shadow: 0 1px 2px rgba(15,28,46,.05), 0 1px 1px rgba(15,28,46,.04); }
+.section { padding-block: 44px 0; }
+/* La cabecera de seccion cierra con una regla de 2 px y un filete de oro
+   de 54 px encima. El filete es lo que convierte un titulo en el
+   principio de algo: sin el, cinco secciones seguidas se leen como una
+   lista larga. Va en ::after y no en un elemento, para no tocar el HTML. */
 .sec-head {
+  position: relative;
   display: flex; align-items: baseline; gap: 14px;
-  border-bottom: 1px solid var(--line); padding-bottom: 10px; margin-bottom: 20px;
+  border-bottom: 2px solid var(--linea-fuerte); padding-bottom: 12px; margin-bottom: 22px;
   flex-wrap: wrap;
+}
+.sec-head::after {
+  content: ''; position: absolute; left: 0; bottom: -2px;
+  width: 54px; height: 2px; background: var(--gold);
 }
 .sec-title {
   color: var(--cream); font-family: var(--display);
-  font-size: 25px; font-weight: 600; letter-spacing: -.2px;
+  font-size: 27px; font-weight: 600; letter-spacing: -.3px; line-height: 1.15;
+  font-variation-settings: 'opsz' 40;
 }
 .sec-ref { color: var(--faint); font-family: var(--mono); font-size: 9px; letter-spacing: 1px; margin-left: auto; }
 
 .stat-grid {
-  display: grid; gap: 1px; background: var(--line-2);
+  display: grid; gap: 1px; background: var(--panel);
   border: 1px solid var(--line-2);
   
   grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
 }
-.stat { background: var(--panel); padding: 16px 17px 15px; }
+.stat { background: var(--panel); padding: 16px 17px 15px;
+  outline: 1px solid var(--line-2); }
 .stat-label {
   font-family: var(--mono); font-size: 8.5px; letter-spacing: 1.3px;
   color: var(--muted); text-transform: uppercase; margin-bottom: 9px;
@@ -225,22 +254,25 @@ button { background: none; border: none; cursor: pointer; }
   font-family: var(--mono); font-size: 9px; letter-spacing: .6px;
   padding: 3px 7px; border-radius: 2px; white-space: nowrap;
 }
-.flag-warn { color: var(--amber); background: rgba(251,191,36,.09); border: 1px solid rgba(251,191,36,.26); }
-.flag-stop { color: var(--red);   background: rgba(248,113,113,.09); border: 1px solid rgba(248,113,113,.26); }
-.flag-ok   { color: var(--green); background: rgba(52,211,153,.09); border: 1px solid rgba(52,211,153,.26); }
+.flag-warn { color: var(--amber); background: rgba(180,83,9,.09); border: 1px solid rgba(180,83,9,.26); }
+.flag-stop { color: var(--red);   background: rgba(185,28,28,.09); border: 1px solid rgba(185,28,28,.26); }
+.flag-ok   { color: var(--green); background: rgba(4,120,87,.09); border: 1px solid rgba(4,120,87,.26); }
 
 .toolbar {
   display: flex; gap: 10px; flex-wrap: wrap; align-items: center;
   margin-bottom: 14px;
 }
 .toolbar select, .toolbar .tbtn {
-  background: var(--panel-2); border: 1px solid var(--line);
-  color: var(--text); font-family: var(--mono); font-size: 10px;
-  letter-spacing: .8px; padding: 7px 10px; border-radius: 2px;
-  transition: border-color .18s, color .18s;
+  background: var(--panel); border: 1px solid var(--linea-fuerte);
+  color: var(--text); font-family: var(--mono); font-size: 10px; font-weight: 600;
+  letter-spacing: .8px; padding: 8px 12px; border-radius: 3px;
+  box-shadow: 0 1px 1px rgba(15,28,46,.05);
+  transition: border-color .18s, color .18s, background .18s;
 }
-.toolbar select:hover, .tbtn:hover { border-color: rgba(201,168,76,.4); color: var(--cream); }
-.tbtn[aria-pressed="true"] { color: var(--bg); background: var(--gold); border-color: var(--gold); font-weight: 700; }
+.toolbar select:hover, .tbtn:hover { border-color: var(--gold); color: var(--cream); background: var(--raise); }
+.tbtn[aria-pressed="true"] { color: #fff; background: var(--gold); border-color: var(--gold-hi); font-weight: 700;
+  box-shadow: inset 0 -2px 0 rgba(15,28,46,.22); }
+.tbtn:active { transform: translateY(1px); }
 .toolbar-count { margin-left: auto; font-family: var(--mono); font-size: 9.5px; color: var(--muted); letter-spacing: .6px; }
 
 .table-scroll { overflow-x: auto; border: 1px solid var(--line-2); }
@@ -268,7 +300,7 @@ table.pipe td { padding: 11px 12px; vertical-align: middle; font-size: 13.5px; }
 .score-cell { display: flex; align-items: center; gap: 10px; min-width: 128px; }
 .score-num { font-family: var(--mono); font-size: 14px; font-weight: 700; color: var(--cream); font-variant-numeric: tabular-nums; min-width: 38px; }
 .score-num.is-empty { color: var(--faint); font-size: 10px; font-weight: 400; letter-spacing: .6px; }
-.score-bar { flex: 1; height: 5px; background: rgba(165,180,200,.10); border-radius: 3px; overflow: hidden; min-width: 54px; }
+.score-bar { flex: 1; height: 5px; background: var(--track); border-radius: 3px; overflow: hidden; min-width: 54px; }
 .score-fill { display: block; height: 100%; border-radius: 3px; transition: width .35s ease; }
 
 /* ── AREA DE TRABAJO ──────────────────────────────────────────────
@@ -326,20 +358,23 @@ table.pipe td { padding: 11px 12px; vertical-align: middle; font-size: 13.5px; }
 /* Control segmentado. Antes eran dos .tbtn sueltos heredados de la barra
    de filtros: se leian como dos filtros, no como las dos caras de un
    expediente. Ahora son un solo control, y el data room lleva su color. */
-.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 3px;
-  overflow: hidden; background: var(--panel-2); }
+.seg { display: inline-flex; border: 1px solid var(--linea-fuerte); border-radius: 4px;
+  overflow: hidden; background: var(--panel-2);
+  box-shadow: 0 1px 2px rgba(15,28,46,.07); }
 .seg button {
   font-family: var(--mono); font-size: 10.5px; font-weight: 700; letter-spacing: 1.2px;
-  text-transform: uppercase; padding: 11px 20px; background: none; border: none;
-  border-right: 1px solid var(--line); color: var(--muted); cursor: pointer;
+  text-transform: uppercase; padding: 12px 22px; background: none; border: none;
+  border-right: 1px solid var(--line); color: var(--text); cursor: pointer;
   transition: background .15s ease, color .15s ease;
 }
 .seg button:last-child { border-right: none; }
-.seg button:hover { color: var(--cream); background: rgba(201,168,76,.07); }
+.seg button:hover { color: var(--cream); background: rgba(138,109,31,.07); }
 .seg button[data-pane="drPane"] { color: var(--cyan); }
-.seg button[data-pane="drPane"]:hover { background: var(--cyan-soft); color: #9AD8EC; }
-.seg button[aria-selected="true"] { background: var(--gold); color: var(--bg); }
-.seg button[data-pane="drPane"][aria-selected="true"] { background: var(--cyan); color: var(--bg); }
+.seg button[data-pane="drPane"]:hover { background: var(--cyan-soft); color: var(--cyan-hi); }
+.seg button[aria-selected="true"] { background: var(--gold); color: #fff;
+  box-shadow: inset 0 -2px 0 rgba(15,28,46,.22); }
+.seg button[data-pane="drPane"][aria-selected="true"] { background: var(--cyan); color: #fff;
+  box-shadow: inset 0 -2px 0 rgba(15,28,46,.22); }
 .seg-sm button { padding: 7px 13px; font-size: 9.5px; letter-spacing: 1px; }
 
 /* El panel del data room se tine del mismo acento, para que el color
@@ -352,7 +387,7 @@ table.pipe td { padding: 11px 12px; vertical-align: middle; font-size: 13.5px; }
   position: sticky; top: 0; z-index: 40;
   display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
   margin: 0 -24px 18px; padding: 10px 24px;
-  background: rgba(11,21,38,.94); backdrop-filter: blur(8px);
+  background: var(--barra); backdrop-filter: blur(8px);
   border-bottom: 1px solid var(--line);
 }
 .db-label { font-family: var(--mono); font-size: 8px; letter-spacing: 1.3px;
@@ -422,19 +457,19 @@ section.section, .work-main { scroll-margin-top: 66px; }
 .dim-name { max-width: 34ch; flex: 0 1 auto; }
 .dim-top { gap: 12px; }
 .dim-top .dim-w { margin-left: auto; }
-.dim-track { flex: 1; height: 6px; background: rgba(165,180,200,.10); border-radius: 3px; overflow: hidden; }
+.dim-track { flex: 1; height: 6px; background: var(--track); border-radius: 3px; overflow: hidden; }
 .dim-fill { display: block; height: 100%; background: var(--gold); border-radius: 3px; transition: width .3s ease; }
 
-.dim-row.is-lever { background: rgba(201,168,76,.045); box-shadow: inset 2px 0 0 var(--gold); padding-left: 10px; margin-left: -10px; }
+.dim-row.is-lever { background: rgba(138,109,31,.05); box-shadow: inset 2px 0 0 var(--gold); padding-left: 10px; margin-left: -10px; }
 .lever-tag {
   font-family: var(--mono); font-size: 7.5px; font-weight: 700; letter-spacing: 1px;
-  color: var(--bg); background: var(--gold); padding: 2px 5px; border-radius: 2px; flex-shrink: 0;
+  color: #fff; background: var(--gold); padding: 2px 5px; border-radius: 2px; flex-shrink: 0;
 }
 .dim-anchor { font-size: 11.5px; color: var(--muted); margin-top: 6px; font-style: italic; line-height: 1.45; }
 
 .dim-slider { width: 100%; margin-top: 6px; height: 14px; background: none; -webkit-appearance: none; appearance: none; cursor: pointer; }
-.dim-slider::-webkit-slider-runnable-track { height: 2px; background: rgba(165,180,200,.18); border-radius: 2px; }
-.dim-slider::-moz-range-track { height: 2px; background: rgba(165,180,200,.18); border-radius: 2px; }
+.dim-slider::-webkit-slider-runnable-track { height: 2px; background: var(--track); border-radius: 2px; }
+.dim-slider::-moz-range-track { height: 2px; background: var(--track); border-radius: 2px; }
 .dim-slider::-webkit-slider-thumb {
   -webkit-appearance: none; appearance: none; width: 11px; height: 11px; border-radius: 50%;
   background: var(--gold); border: 2px solid var(--panel); margin-top: -4.5px;
@@ -458,13 +493,13 @@ section.section, .work-main { scroll-margin-top: 66px; }
   margin-top: 13px; padding: 10px 12px; text-align: center;
   font-family: var(--mono); font-size: 11px; font-weight: 700; letter-spacing: 1.6px;
 }
-.gg-verdict.go { color: var(--green); background: rgba(52,211,153,.08); border: 1px solid rgba(52,211,153,.3); }
-.gg-verdict.cio { color: var(--amber); background: rgba(251,191,36,.08); border: 1px solid rgba(251,191,36,.3); }
-.gg-verdict.no { color: var(--red); background: rgba(248,113,113,.08); border: 1px solid rgba(248,113,113,.3); }
+.gg-verdict.go { color: var(--green); background: rgba(4,120,87,.08); border: 1px solid rgba(4,120,87,.3); }
+.gg-verdict.cio { color: var(--amber); background: rgba(180,83,9,.08); border: 1px solid rgba(180,83,9,.3); }
+.gg-verdict.no { color: var(--red); background: rgba(185,28,28,.08); border: 1px solid rgba(185,28,28,.3); }
 
 .lever {
   margin-top: 16px; padding: 13px 15px;
-  border-left: 2px solid var(--gold); background: rgba(201,168,76,.05);
+  border-left: 2px solid var(--gold); background: rgba(138,109,31,.05);
 }
 .lever h4 { font-family: var(--mono); font-size: 9px; font-weight: 700; letter-spacing: 1.3px; color: var(--gold); margin-bottom: 7px; }
 .lever p { font-size: 13px; color: var(--text); }
@@ -483,11 +518,11 @@ section.section, .work-main { scroll-margin-top: 66px; }
 .bandrow { display: flex; align-items: center; gap: 11px; padding: 7px 0; border-bottom: 1px solid var(--line-2); }
 .bandrow:last-child { border-bottom: none; }
 .bandrow .bl { font-family: var(--mono); font-size: 10px; font-weight: 700; min-width: 66px; letter-spacing: .6px; }
-.bandrow .bt { flex: 1; height: 16px; background: rgba(165,180,200,.07); border-radius: 2px; overflow: hidden; }
+.bandrow .bt { flex: 1; height: 16px; background: var(--track); border-radius: 2px; overflow: hidden; }
 .bandrow .bf { display: block; height: 100%; border-radius: 2px; }
 .bandrow .bn { font-family: var(--mono); font-size: 11px; color: var(--text); min-width: 58px; text-align: right; font-variant-numeric: tabular-nums; }
 
-.gauge-track { height: 9px; background: rgba(165,180,200,.10); border-radius: 5px; overflow: hidden; margin: 14px 0 8px; position: relative; }
+.gauge-track { height: 9px; background: var(--track); border-radius: 5px; overflow: hidden; margin: 14px 0 8px; position: relative; }
 .gauge-fill { display: block; height: 100%; background: var(--red); border-radius: 5px; }
 .gauge-ticks { display: flex; justify-content: space-between; font-family: var(--mono); font-size: 8.5px; color: var(--faint); letter-spacing: .5px; }
 .empty-state {
@@ -532,8 +567,8 @@ section.section, .work-main { scroll-margin-top: 66px; }
 
 
 /* ── RESERVA ──────────────────────────────────────────────────────────── */
-.reserva { margin-top: 16px; border: 1px solid rgba(248,113,113,.28);
-  border-left: 3px solid var(--red); background: rgba(248,113,113,.04); padding: 14px 15px; }
+.reserva { margin-top: 16px; border: 1px solid rgba(185,28,28,.28);
+  border-left: 3px solid var(--red); background: rgba(185,28,28,.04); padding: 14px 15px; }
 .reserva h4 { font-family: var(--mono); font-size: 9px; font-weight: 700; letter-spacing: 1.3px;
   color: var(--red); text-transform: uppercase; margin-bottom: 10px; }
 .reserva .pista { font-size: 11.5px; color: var(--muted); line-height: 1.5; margin-top: 8px; }
@@ -551,7 +586,7 @@ section.section, .work-main { scroll-margin-top: 66px; }
   font-family: var(--mono); font-size: 10px; letter-spacing: .8px; padding: 7px 10px; border-radius: 2px; }
 .ck-prog { margin-left: auto; min-width: 210px; }
 .ck-prog b { font-family: var(--mono); font-size: 9.5px; letter-spacing: .6px; color: var(--muted); }
-.ck-bar { height: 7px; background: rgba(165,180,200,.12); border-radius: 4px; overflow: hidden; margin-top: 5px; }
+.ck-bar { height: 7px; background: var(--track); border-radius: 4px; overflow: hidden; margin-top: 5px; }
 .ck-bar i { display: block; height: 100%; background: var(--green); transition: width .3s ease; }
 .ck-num { font-family: var(--mono); font-size: 9.5px; color: var(--faint); }
 .ck-area { font-family: var(--mono); font-size: 9px; letter-spacing: .6px; color: var(--gold); }
@@ -577,22 +612,28 @@ table.pipe td select.ck-est { background: var(--panel-2); border: 1px solid var(
 }
 .fld textarea { font-size: 13px; line-height: 1.55; resize: vertical; min-height: 68px; }
 .fld input:focus, .fld select:focus, .fld textarea:focus {
-  outline: none; border-color: rgba(201,168,76,.5); }
+  outline: none; border-color: var(--gold-line); }
 .fld.check { flex-direction: row; align-items: center; gap: 9px; }
 .fld.check input { width: 16px; height: 16px; accent-color: var(--gold); flex-shrink: 0; }
 .fld.check label { text-transform: none; font-size: 12px; letter-spacing: .2px; color: var(--text); }
 .fld .pista { font-family: var(--body); font-size: 11.5px; color: var(--muted);
   line-height: 1.5; text-transform: none; letter-spacing: 0; }
 
-.btn-oro { padding: 11px 16px; background: var(--gold); color: var(--bg); border: none;
-  font-family: var(--mono); font-size: 9.5px; font-weight: 700; letter-spacing: 1.3px;
-  cursor: pointer; margin-top: 14px; }
-.btn-oro:hover { background: var(--cream); }
-.btn-oro[disabled] { opacity: .5; cursor: progress; }
-.btn-mini { background: none; border: 1px solid var(--line); color: var(--muted);
-  font-family: var(--mono); font-size: 8.5px; letter-spacing: .9px; padding: 4px 8px;
-  cursor: pointer; border-radius: 2px; }
-.btn-mini:hover { border-color: rgba(248,113,113,.5); color: var(--red); }
+.btn-oro { padding: 12px 20px; background: var(--gold); color: #fff; border: none;
+  border-radius: 3px; font-family: var(--mono); font-size: 10px; font-weight: 700;
+  letter-spacing: 1.3px; cursor: pointer; margin-top: 14px;
+  box-shadow: 0 1px 2px rgba(15,28,46,.18), inset 0 1px 0 rgba(255,255,255,.12);
+  transition: background .15s ease, box-shadow .15s ease, transform .06s ease; }
+.btn-oro:hover { background: var(--gold-hi); box-shadow: 0 2px 5px rgba(15,28,46,.22); }
+/* Que el boton se hunda al pulsarlo. Es la unica confirmacion inmediata
+   que hay: el guardado tarda, y sin esto parece que no ha pasado nada. */
+.btn-oro:active { transform: translateY(1px); box-shadow: 0 1px 1px rgba(15,28,46,.2); }
+.btn-oro[disabled] { opacity: .5; cursor: progress; box-shadow: none; transform: none; }
+.btn-mini { background: var(--panel); border: 1px solid var(--line); color: var(--muted);
+  font-family: var(--mono); font-size: 8.5px; font-weight: 600; letter-spacing: .9px;
+  padding: 5px 9px; cursor: pointer; border-radius: 3px;
+  transition: border-color .18s, color .18s; }
+.btn-mini:hover { border-color: rgba(185,28,28,.5); color: var(--red); }
 /* Decision y desenlace: mismo patron que .reserva, pero en el color de la
    casa en vez del rojo. Registrar un desenlace no es una alarma. */
 .decision { margin-top: 16px; border: 1px solid var(--line);
@@ -621,19 +662,19 @@ table.pipe td select.ck-est { background: var(--panel-2); border: 1px solid var(
   padding: 2px 6px; border: 1px solid; border-radius: 2px; }
 .doc-fuente.f-fichero { color: var(--cyan); border-color: rgba(79,182,214,.4); }
 .doc-fuente.f-enlace  { color: var(--text); border-color: var(--line-2); }
-.doc-fuente.f-hueco   { color: var(--amber); border-color: rgba(251,191,36,.35); }
+.doc-fuente.f-hueco   { color: var(--amber); border-color: rgba(180,83,9,.35); }
 .doc-acc { white-space: nowrap; text-align: right; }
 .doc-acc > * { margin-left: 10px; }
 .ck-cab input[type=search] {
   background: var(--panel-2); border: 1px solid var(--line); border-radius: 2px;
   color: var(--text); font-family: var(--mono); font-size: 10px; letter-spacing: .6px;
   padding: 7px 10px; min-width: 220px; }
-.ck-cab input[type=search]:focus { outline: none; border-color: rgba(201,168,76,.45); }
+.ck-cab input[type=search]:focus { outline: none; border-color: var(--gold-line); }
 
 .doc-abrir { background: none; border: none; padding: 0; cursor: pointer;
   font-family: var(--mono); font-size: 9.5px; font-weight: 700; letter-spacing: 1.1px;
   color: var(--cyan); text-transform: uppercase; }
-.doc-abrir:hover { color: #9AD8EC; text-decoration: underline; }
+.doc-abrir:hover { color: var(--cyan-hi); text-decoration: underline; }
 .doc-meta { font-family: var(--mono); font-size: 8.5px; letter-spacing: .5px;
   color: var(--faint); margin-top: 4px; }
 /* Adjuntar a un hueco declarado. El input va dentro del label y oculto:
@@ -642,13 +683,13 @@ table.pipe td select.ck-est { background: var(--panel-2); border: 1px solid var(
   font-family: var(--mono); font-size: 8.5px; font-weight: 700; letter-spacing: 1px;
   text-transform: uppercase; color: var(--cyan);
   border: 1px solid rgba(79,182,214,.4); border-radius: 2px; padding: 5px 10px; }
-.doc-adj:hover { background: var(--cyan-soft); color: #9AD8EC; }
+.doc-adj:hover { background: var(--cyan-soft); color: var(--cyan-hi); }
 .doc-adj input { display: none; }
 .fld input[type=file] {
   background: var(--panel-2); border: 1px solid var(--line); border-radius: 2px;
   color: var(--text); font-family: var(--mono); font-size: 10px; padding: 8px 10px; width: 100%; }
 .fld input[type=file]::file-selector-button {
-  background: var(--cyan); color: var(--bg); border: none; border-radius: 2px;
+  background: var(--cyan); color: #fff; border: none; border-radius: 2px;
   font-family: var(--mono); font-size: 9px; font-weight: 700; letter-spacing: 1px;
   text-transform: uppercase; padding: 6px 12px; margin-right: 10px; cursor: pointer; }
 
@@ -673,7 +714,7 @@ table.pipe td select.ck-est { background: var(--panel-2); border: 1px solid var(
 .hoy-eti { font-family: var(--mono); font-size: 8px; letter-spacing: 1px;
   text-transform: uppercase; color: var(--faint); }
 .hoy-mio { font-family: var(--mono); font-size: 8px; font-weight: 700; letter-spacing: 1px;
-  color: var(--bg); background: var(--gold); padding: 2px 5px; border-radius: 2px; }
+  color: #fff; background: var(--gold); padding: 2px 5px; border-radius: 2px; }
 .sec-ref.es-vencido { color: var(--red); }
 @media (max-width: 560px) {
   .hoy-fila { gap: 7px; }
@@ -683,9 +724,9 @@ table.pipe td select.ck-est { background: var(--panel-2); border: 1px solid var(
 
 .reloj { font-family: var(--mono); font-size: 8px; font-weight: 700; letter-spacing: .9px;
   padding: 2px 6px; border: 1px solid; border-radius: 2px; white-space: nowrap; }
-.reloj.r-vencido { color: var(--red);   border-color: rgba(248,113,113,.45); background: rgba(248,113,113,.08); }
-.reloj.r-hoy     { color: var(--amber); border-color: rgba(251,191,36,.45);  background: rgba(251,191,36,.08); }
-.reloj.r-pronto  { color: var(--amber); border-color: rgba(251,191,36,.28); }
+.reloj.r-vencido { color: var(--red);   border-color: rgba(185,28,28,.45); background: rgba(185,28,28,.08); }
+.reloj.r-hoy     { color: var(--amber); border-color: rgba(180,83,9,.45);  background: rgba(180,83,9,.08); }
+.reloj.r-pronto  { color: var(--amber); border-color: rgba(180,83,9,.28); }
 .reloj.r-holgado { color: var(--muted); border-color: var(--line-2); }
 .q-side { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
 /* El documento que cierra el punto. Mismo acento que el data room,
@@ -706,19 +747,20 @@ table.pipe td select.ck-est { background: var(--panel-2); border: 1px solid var(
 .frm-msg.err { color: var(--red); }
 .frm-msg.ok  { color: var(--green); }
 .aviso-precio { margin-top: 10px; padding: 10px 12px; border-left: 2px solid var(--amber);
-  background: rgba(251,191,36,.06); font-size: 12px; color: var(--text); line-height: 1.55; }
+  background: rgba(180,83,9,.06); font-size: 12px; color: var(--text); line-height: 1.55; }
 
 /* El CSS heredado acota el aspecto de .tbtn a `.toolbar .tbtn`. Las pestañas
    del data room y el boton de guardar viven fuera de una .toolbar, asi que sin
    esto se renderizan como texto plano: solo la regla del estado pulsado es
    global y por eso unicamente la pestaña activa se veia como boton. */
 .tbtn {
-  background: var(--panel-2); border: 1px solid var(--line);
-  color: var(--text); font-family: var(--mono); font-size: 10px;
-  letter-spacing: .8px; padding: 7px 10px; border-radius: 2px;
-  transition: border-color .18s, color .18s;
+  background: var(--panel); border: 1px solid var(--linea-fuerte);
+  color: var(--text); font-family: var(--mono); font-size: 10px; font-weight: 600;
+  letter-spacing: .8px; padding: 8px 12px; border-radius: 3px;
+  box-shadow: 0 1px 1px rgba(15,28,46,.05);
+  transition: border-color .18s, color .18s, background .18s;
 }
-.tbtn:hover { border-color: rgba(201,168,76,.4); color: var(--cream); }
+.tbtn:hover { border-color: var(--gold-line); color: var(--cream); }
 
 /* ── DATA ROOM ────────────────────────────────────────────────────────── */
 .dr-tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
@@ -733,10 +775,10 @@ table.pipe td select.ck-est { background: var(--panel-2); border: 1px solid var(
   font-weight: 600; line-height: 1.3; }
 .doc p { color: var(--muted); font-size: 12.5px; line-height: 1.5; margin-top: 5px; }
 .doc a { display: block; text-align: center; padding: 9px; background: var(--gold);
-  color: var(--bg); text-decoration: none; font-family: var(--mono); font-size: 9.5px;
+  color: #fff; text-decoration: none; font-family: var(--mono); font-size: 9.5px;
   font-weight: 700; letter-spacing: 1.2px; }
 .doc a:hover { background: var(--cream); }
-.doc .pend { text-align: center; padding: 9px; border: 1px dashed rgba(251,191,36,.4);
+.doc .pend { text-align: center; padding: 9px; border: 1px dashed rgba(180,83,9,.4);
   color: var(--amber); font-family: var(--mono); font-size: 9px; letter-spacing: 1.2px; }
 
 .kv { display: grid; grid-template-columns: minmax(150px, auto) 1fr; gap: 1px;
@@ -758,7 +800,7 @@ table.pipe td select.ck-est { background: var(--panel-2); border: 1px solid var(
 /* ── ACCESO ────────────────────────────────────────────────────────────── */
 #auth { position: fixed; inset: 0; z-index: 999; display: flex; align-items: center;
   justify-content: center; padding: 24px;
-  background: radial-gradient(circle at 50% 12%, rgba(201,168,76,.07), transparent 42%), var(--bg); }
+  background: radial-gradient(circle at 50% 12%, rgba(138,109,31,.07), transparent 42%), var(--bg); }
 .abox { width: min(430px,100%); border: 1px solid var(--line); background: var(--panel); padding: 30px 28px; }
 .abox h1 { color: var(--cream); font-family: var(--display); font-weight: 600; font-size: 38px;
   line-height: 1; letter-spacing: -.5px; margin: 14px 0 10px; }
@@ -766,11 +808,13 @@ table.pipe td select.ck-est { background: var(--panel-2); border: 1px solid var(
 .abox p { color: var(--muted); font-size: 12.5px; line-height: 1.6; margin-bottom: 20px; }
 .abox input { width: 100%; padding: 12px 13px; background: var(--bg); border: 1px solid var(--line);
   color: var(--cream); font-family: var(--mono); font-size: 13px; margin-bottom: 11px; }
-.abox input:focus { outline: none; border-color: rgba(201,168,76,.5); }
-.abox button { width: 100%; padding: 12px; background: var(--gold); color: var(--bg);
+.abox input:focus { outline: none; border-color: var(--gold-line); }
+.abox button { width: 100%; padding: 12px; background: var(--gold); color: #fff;
   font-family: var(--mono); font-size: 10px; font-weight: 700; letter-spacing: 1.6px;
   cursor: pointer; border: none; }
-.abox button[disabled] { opacity: .55; cursor: progress; }
+.abox button:hover { background: var(--gold-hi); }
+.abox button:active { transform: translateY(1px); }
+.abox button[disabled] { opacity: .55; cursor: progress; transform: none; }
 .amsg { margin-top: 12px; font-family: var(--mono); font-size: 10px; letter-spacing: .5px;
   line-height: 1.7; min-height: 13px; }
 .amsg.err { color: var(--red); }
@@ -790,10 +834,10 @@ table.pipe td select.ck-est { background: var(--panel-2); border: 1px solid var(
 .linkbtn:hover { color: var(--gold); }
 
 .readonly-note { margin-top: 14px; padding: 11px 13px; border-left: 2px solid var(--text);
-  background: rgba(165,180,200,.05); font-size: 12.5px; color: var(--text); }
+  background: var(--wash); font-size: 12.5px; color: var(--text); }
 
-.banner { margin-top: 18px; padding: 14px 16px; border: 1px solid rgba(248,113,113,.3);
-  border-left: 3px solid var(--red); background: rgba(248,113,113,.05);
+.banner { margin-top: 18px; padding: 14px 16px; border: 1px solid rgba(185,28,28,.3);
+  border-left: 3px solid var(--red); background: rgba(185,28,28,.05);
   color: var(--text); font-size: 13px; }
 .banner b { color: var(--red); font-family: var(--mono); font-size: 10px; letter-spacing: 1.2px; }
 

@@ -215,19 +215,19 @@ function sparkline(serie) {
     const last = i === serie.length - 1;
     if (r.estado === 'publicado' && !last) return '';
     const cx = x(i).toFixed(1), cy = y(r.valor).toFixed(1);
-    if (last) return `<circle cx="${cx}" cy="${cy}" r="3" fill="#C9A84C" stroke="#0B1526" stroke-width="1.5"></circle>`;
-    return `<circle cx="${cx}" cy="${cy}" r="2.4" fill="#0B1526" stroke="${
-      r.estado === 'reconstruido' ? '#5A6A80' : '#FBBF24'}" stroke-width="1.2"></circle>`;
+    if (last) return `<circle cx="${cx}" cy="${cy}" r="3" fill="var(--gold)" stroke="var(--panel)" stroke-width="1.5"></circle>`;
+    return `<circle cx="${cx}" cy="${cy}" r="2.4" fill="var(--panel)" stroke="${
+      r.estado === 'reconstruido' ? 'var(--faint)' : 'var(--amber)'}" stroke-width="1.2"></circle>`;
   }).join('');
   return `<svg viewBox="0 0 ${W} ${H}" width="100%" height="${H}" role="img"
     aria-label="Índice de riesgo ZRC, ${serie.length} días, de ${vals[0]} a ${vals[vals.length-1]}"
     preserveAspectRatio="none" style="display:block;max-width:100%">
     <defs><linearGradient id="sparkG" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="#C9A84C" stop-opacity=".22"></stop>
-      <stop offset="100%" stop-color="#C9A84C" stop-opacity="0"></stop>
+      <stop offset="0%" stop-color="var(--gold)" stop-opacity=".22"></stop>
+      <stop offset="100%" stop-color="var(--gold)" stop-opacity="0"></stop>
     </linearGradient></defs>
     <path d="${area}" fill="url(#sparkG)"></path>
-    <path d="${d}" fill="none" stroke="#C9A84C" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"></path>
+    <path d="${d}" fill="none" stroke="var(--gold)" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"></path>
     ${dots}</svg>`;
 }
 
@@ -242,9 +242,9 @@ function tarjetaRiesgo() {
     <div class="stat-value">${ult.valor}<small>${flecha} ${Math.abs(delta)}</small></div>
     <div class="spark-wrap">${sparkline(state.risk)}</div>
     <div class="spark-legend">
-      <span><i style="background:#C9A84C"></i>Publicado</span>
-      <span><i style="border:1.2px solid #FBBF24"></i>Degradado</span>
-      <span><i style="border:1.2px solid #5A6A80"></i>Reconstruido</span>
+      <span><i style="background:var(--gold)"></i>Publicado</span>
+      <span><i style="border:1.2px solid var(--amber)"></i>Degradado</span>
+      <span><i style="border:1.2px solid var(--faint)"></i>Reconstruido</span>
     </div>
     <div class="stat-sub">${esc(ult.fecha)}${dias > 2 ? ` · <b style="color:var(--amber)">${dias} días sin actualizar</b>` : ''}</div></div>`;
 }
@@ -691,7 +691,7 @@ function renderDetail() {
      <span>${esc(f.texto)}${f.referencia ? ` <span class="dim-w">${esc(f.referencia)}</span>` : ''}</span></div>`).join('')}</div>` : '';
 
   const action = canWrite()
-    ? `<button id="saveScore" class="tbtn" style="margin-top:16px;width:100%;padding:12px"
+    ? `<button id="saveScore" class="btn-oro" style="margin-top:16px;width:100%"
          ${vals ? '' : 'disabled'}>GUARDAR PUNTUACIÓN</button>
        <div class="amsg" id="saveMsg"></div>`
     : `<div class="readonly-note">Tu acceso es de <b>solo lectura</b>. Puedes consultarlo todo,
@@ -1653,7 +1653,7 @@ function renderDealBar() {
 
 function renderAll() { renderStats(); renderHoy(); renderQueue(); renderFilters(); renderPipe(); renderDetail(); renderDataroom(); renderCalibracion(); renderArquitectura(); renderDealBar(); }
 
-function select(id) { state.selected = id; state.draft = null; renderPipe(); renderDetail(); renderDataroom(); renderDealBar(); $('detail').scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }
+function select(id) { state.selected = id; state.draft = null; renderPipe(); renderDetail(); renderDataroom(); renderDealBar(); $('detail')?.closest('.work-main')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
 
 function wire() {
   $('pipeBody').addEventListener('click', e => { const tr = e.target.closest('tr[data-id]'); if (tr) select(tr.dataset.id); });

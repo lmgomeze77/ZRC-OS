@@ -1,87 +1,69 @@
 -- =====================================================================
--- ZRC · QUE HAY APLICADO DE VERDAD
+-- ZRC · QUE HAY APLICADO. UNA SOLA CONSULTA.
 --
--- No cambia nada. Dice, modulo por modulo, si sus objetos existen, si
--- 'authenticated' puede leerlos (que es con quien entra el navegador) y
--- cuantas filas tienen. Ejecutar en el SQL Editor de Supabase.
+-- Una sola a proposito: el SQL Editor de Supabase solo ensena el
+-- resultado de la ULTIMA sentencia, asi que un diagnostico en tres
+-- consultas ocultaba dos tercios de la respuesta.
+--
+-- El veredicto va primero para que se lea en una pantalla estrecha, y
+-- lo que falta sale arriba. No cambia nada.
 -- =====================================================================
-with objetos(modulo, fichero, obj, tipo) as (values
-  ('Esquema base',   '01_schema.sql',    'opportunities',      'tabla'),
-  ('Esquema base',   '01_schema.sql',    'v_opportunity_scores','vista'),
-  ('Data room',      '06_dataroom.sql',  'documents',          'tabla'),
-  ('Data room',      '06_dataroom.sql',  'economics',          'tabla'),
-  ('Doctrina',       '09_doctrina.sql',  'scoring_rubrics',    'tabla'),
-  ('Doctrina',       '09_doctrina.sql',  'risk_index',         'tabla'),
-  ('Cola',           '11_cola.sql',      'v_pendientes',       'vista'),
-  ('Reserva',        '12_reserva.sql',   'opportunity_access', 'tabla'),
-  ('Checklist',      '13_checklist.sql', 'checklist_items',    'tabla'),
-  ('Actividad',      '16_actividad.sql', 'activity',           'tabla'),
-  ('Actividad',      '16_actividad.sql', 'v_actividad',        'vista'),
-  ('Indice',         '17_indice.sql',    'risk_mesas',         'tabla'),
-  ('Indice',         '17_indice.sql',    'risk_lecturas',      'tabla'),
-  ('Indice',         '17_indice.sql',    'v_risk_serie',       'vista'),
-  ('Indice',         '17_indice.sql',    'v_risk_estado',      'vista'),
-  ('Indice',         '17_indice.sql',    'v_pendientes_firma', 'vista'),
-  ('Sectorial',      '18_sectorial.sql', 'sectors',            'tabla'),
-  ('Sectorial',      '18_sectorial.sql', 'sector_dimensions',  'tabla'),
-  ('Sectorial',      '18_sectorial.sql', 'sector_readings',    'tabla'),
-  ('Sectorial',      '18_sectorial.sql', 'v_sector_score',     'vista'),
-  ('Sectorial',      '18_sectorial.sql', 'v_sector_pipeline',  'vista')
+with obj(fichero, que) as (values
+  ('06_dataroom.sql','documents'), ('06_dataroom.sql','economics'),
+  ('09_doctrina.sql','scoring_rubrics'), ('09_doctrina.sql','risk_index'),
+  ('11_cola.sql','v_pendientes'), ('12_reserva.sql','opportunity_access'),
+  ('13_checklist.sql','checklist_items'),
+  ('16_actividad.sql','activity'), ('16_actividad.sql','v_actividad'),
+  ('17_indice.sql','risk_mesas'), ('17_indice.sql','risk_lecturas'),
+  ('17_indice.sql','v_risk_serie'), ('17_indice.sql','v_risk_estado'),
+  ('17_indice.sql','v_pendientes_firma'),
+  ('18_sectorial.sql','sectors'), ('18_sectorial.sql','sector_dimensions'),
+  ('18_sectorial.sql','sector_readings'),
+  ('18_sectorial.sql','v_sector_score'), ('18_sectorial.sql','v_sector_pipeline')
+),
+col(fichero, que, tabla, columna) as (values
+  ('14_checklist_documento.sql','checklist_items.document_id','checklist_items','document_id'),
+  ('15_plazos.sql','checklist_items.vence_en','checklist_items','vence_en'),
+  ('15_plazos.sql','scoring_bands.plazo_horas','scoring_bands','plazo_horas'),
+  ('15_plazos.sql','v_pendientes.vence_en','v_pendientes','vence_en'),
+  ('18_sectorial.sql','opportunities.sector','opportunities','sector')
+),
+filas as (
+  select case when to_regclass('public.'||o.que) is null then '1 · FALTA'
+              when not has_table_privilege('authenticated','public.'||o.que,'SELECT')
+                   then '2 · SIN PERMISO'
+              else '9 · ok' end as veredicto,
+         o.fichero, o.que
+    from obj o
+  union all
+  select case when not exists (select 1 from information_schema.columns c
+                 where c.table_name = col.tabla and c.column_name = col.columna)
+              then '1 · FALTA' else '9 · ok' end,
+         col.fichero, col.que
+    from col
+  union all
+  select coalesce((select case when rc.delete_rule = 'SET NULL' then '9 · ok'
+                    else '1 · VERSION VIEJA (' || rc.delete_rule || ')' end
+            from information_schema.table_constraints tc
+            join information_schema.referential_constraints rc
+              on rc.constraint_name = tc.constraint_name
+           where tc.table_name='activity' and tc.constraint_type='FOREIGN KEY'
+             and tc.constraint_name like '%opportunity_id%' limit 1), '1 · FALTA'),
+         '16_actividad.sql', 'activity: borrado sin cascada'
+  union all
+  select '0 · DATO', 'pipeline', 'expedientes vivos: ' ||
+         (select count(*) from opportunities where estado not in ('archivado','cerrado'))
+  union all
+  select '0 · DATO', f, etiqueta || ': ' ||
+         coalesce((xpath('/row/c/text()',
+            query_to_xml('select count(*) as c from ' || quote_ident(t), false, true, '')
+          ))[1]::text, '0')
+    from (values ('16_actividad.sql','activity','movimientos registrados'),
+                 ('17_indice.sql','risk_lecturas','lecturas del indice'),
+                 ('18_sectorial.sql','v_sector_score','sectores con lectura')
+         ) as v(f, t, etiqueta)
+   -- Solo se cuenta lo que existe: referenciar una tabla ausente dentro
+   -- de la consulta la tumbaria entera.
+   where to_regclass('public.' || t) is not null
 )
-select o.modulo, o.fichero, o.obj, o.tipo,
-       case when to_regclass('public.' || o.obj) is null
-            then 'NO EXISTE -- falta aplicar el fichero'
-            when not has_table_privilege('authenticated', 'public.' || o.obj, 'SELECT')
-            then 'EXISTE PERO authenticated NO PUEDE LEERLO'
-            else 'ok' end as veredicto
-  from objetos o
- order by o.fichero, o.obj;
-
--- Columnas que anadieron ficheros posteriores sobre tablas que ya existian.
-select 'checklist_items.document_id' as columna, '14_checklist_documento.sql' as fichero,
-       case when exists (select 1 from information_schema.columns
-         where table_name='checklist_items' and column_name='document_id')
-       then 'ok' else 'FALTA' end as veredicto
-union all
-select 'checklist_items.vence_en', '15_plazos.sql',
-       case when exists (select 1 from information_schema.columns
-         where table_name='checklist_items' and column_name='vence_en')
-       then 'ok' else 'FALTA' end
-union all
-select 'scoring_bands.plazo_horas', '15_plazos.sql',
-       case when exists (select 1 from information_schema.columns
-         where table_name='scoring_bands' and column_name='plazo_horas')
-       then 'ok' else 'FALTA' end
-union all
-select 'v_pendientes.vence_en', '15_plazos.sql',
-       case when exists (select 1 from information_schema.columns
-         where table_name='v_pendientes' and column_name='vence_en')
-       then 'ok' else 'FALTA: la bandeja Hoy no tendra nada que ensenar' end
-union all
-select 'opportunities.sector', '18_sectorial.sql',
-       case when exists (select 1 from information_schema.columns
-         where table_name='opportunities' and column_name='sector')
-       then 'ok' else 'FALTA' end
-union all
-select 'activity.opportunity_id = SET NULL', '16_actividad.sql (reaplicar)',
-       coalesce((select case when rc.delete_rule = 'SET NULL' then 'ok'
-                   else 'ES ' || rc.delete_rule || ' -- borrar un expediente fallara' end
-         from information_schema.table_constraints tc
-         join information_schema.referential_constraints rc on rc.constraint_name = tc.constraint_name
-        where tc.table_name = 'activity' and tc.constraint_type = 'FOREIGN KEY'
-          and tc.constraint_name like '%opportunity_id%' limit 1),
-        'no se puede comprobar: activity no existe');
-
--- Y si todo existe, cuanta vida tiene cada cosa.
-select 'expedientes vivos' as concepto, count(*)::text as valor from opportunities
-  where estado not in ('archivado','cerrado')
-union all select 'movimientos en Actividad',
-  coalesce((select count(*)::text from activity), 'tabla ausente')
-union all select 'mesas del barrido',
-  coalesce((select count(*)::text from risk_mesas where activa), 'tabla ausente')
-union all select 'lecturas del indice',
-  coalesce((select count(*)::text from risk_lecturas), 'tabla ausente')
-union all select 'sectores con lectura',
-  coalesce((select count(*)::text from v_sector_score), 'vista ausente')
-union all select 'expedientes sin sector',
-  coalesce((select count(*)::text from opportunities where sector is null), 'columna ausente');
+select veredicto, fichero, que from filas order by veredicto, fichero, que;

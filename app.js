@@ -36,7 +36,7 @@ const state = {
   outcomes: [], decisions: [], outError: null,
   miembros: [], accesos: [],
   actividad: [], actError: null,
-  serie: [], riesgo: null, mesas: [], lecturas: [], mercError: null,
+  serie: [], riesgo: null, mesas: [], lecturas: [], pendFirma: [], mercError: null,
   secScore: [], secPipe: [], secDims: [], secRub: [], secSel: '', secError: null,
   drTab: 'documentos', pane: 'detail', docQ: '', docCat: '', ckPlazo: '', hoyTab: '', nombre: null,
   selected: null, fVert: '', fBand: '', sortKey: 'score', sortDir: -1,
@@ -151,21 +151,24 @@ async function loadAll() {
   // serie entera de lecturas por mesa no la mira nadie.
   try {
     const desde = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
-    const [ser, est, mes, lec] = await Promise.all([
+    const [ser, est, mes, lec, pf] = await Promise.all([
       sb.from('v_risk_serie').select('*').order('fecha'),
       sb.from('v_risk_estado').select('*').maybeSingle(),
       sb.from('risk_mesas').select('*').eq('activa', true).order('orden'),
-      sb.from('risk_lecturas').select('*').gte('fecha', desde)
+      sb.from('risk_lecturas').select('*').gte('fecha', desde),
+      sb.from('v_pendientes_firma').select('*')
     ]);
-    const fallo = [ser, est, mes, lec].find(r => r.error);
+    const fallo = [ser, est, mes, lec, pf].find(r => r.error);
     if (fallo) throw fallo.error;
     state.serie = ser.data ?? [];
     state.riesgo = est.data ?? null;
     state.mesas = mes.data ?? [];
     state.lecturas = lec.data ?? [];
+    state.pendFirma = pf.data ?? [];
     state.mercError = null;
   } catch (err) {
     state.serie = []; state.riesgo = null; state.mesas = []; state.lecturas = [];
+    state.pendFirma = [];
     state.mercError = String(err?.message ?? err);
   }
 
@@ -560,7 +563,10 @@ const MOTIVO = {
   checklist_critico:   ['Checklist crítico', 'Validar antes de abrir la sala de datos.'],
   sin_codigo:          ['Sin código de expediente', 'Asignar código con el patrón del manual (§12.3).'],
   sin_puntuar:         ['Sin puntuar', 'Puntuar contra las rúbricas ancladas.'],
-  checklist_vencido:   ['Checklist vencido', 'Pasó la fecha comprometida y el punto sigue abierto.']
+  checklist_vencido:   ['Checklist vencido', 'Pasó la fecha comprometida y el punto sigue abierto.'],
+  // Los dos que no cuelgan de ningun expediente, sino de la firma.
+  indice_caducado:     ['Índice de riesgo parado', 'Barrer las mesas. Sin eso el índice describe otro mes.'],
+  mesas_sin_fundamento:['Lecturas sin fundamento', 'Anotar de dónde sale cada cifra, o no es una lectura.']
 };
 
 // El reloj, en una sola pieza: lo usan la cola y el checklist y tienen
@@ -665,7 +671,10 @@ function renderHoy() {
 function renderQueue() {
   // Dentro de la misma prioridad manda el reloj: lo vencido primero, y
   // lo que no tiene fecha al final de su grupo.
-  const items = [...state.pend].sort((a, b) =>
+  // Lo de la firma entra en la misma cola que lo de los expedientes. Un
+  // indice parado un mes no es menos trabajo por no colgar de ningun
+  // expediente: en una cola aparte no lo miraria nadie.
+  const items = [...state.pend, ...state.pendFirma].sort((a, b) =>
     a.prioridad - b.prioridad ||
     ((reloj(a.vence_en)?.dias ?? 9e3) - (reloj(b.vence_en)?.dias ?? 9e3))).slice(0, 8);
   if (!items.length) { $('queue').innerHTML = '<div class="q-item"><div class="q-rank">—</div><div><div class="q-why">Nada pendiente.</div></div></div>'; return; }
@@ -677,9 +686,13 @@ function renderQueue() {
     const lado = banda
       ? `<span class="pill pill-${esc(banda)}">${esc(banda)}</span>`
       : `<span class="flag ${stop ? 'flag-stop' : 'flag-warn'}">${stop ? '⛔' : '▲'} ${esc(titulo)}</span>`;
-    return `<div class="q-item" data-goto="${esc(it.opportunity_id)}" role="button" tabindex="0" style="cursor:pointer">
+    // Lo de la firma no tiene expediente: en vez de un salto a ninguna
+    // parte, lleva al bloque de Mercado, que es donde se arregla.
+    const deFirma = !it.opportunity_id;
+    return `<div class="q-item"${deFirma ? ' data-ira="mercado"' : ` data-goto="${esc(it.opportunity_id)}"`}
+      role="button" tabindex="0" style="cursor:pointer">
       <div class="q-rank">${String(i+1).padStart(2,'0')}</div>
-      <div><div class="q-title">${esc(it.nombre)}</div>
+      <div><div class="q-title">${esc(it.nombre ?? 'La firma')}</div>
       <div class="q-why">${esc(it.detalle ?? titulo)}</div>
       <div class="q-act"><b>ACCIÓN</b> · ${esc(accion)}</div></div>
       <div class="q-side">${lado}${pastillaReloj(it.vence_en)}</div>
@@ -2034,7 +2047,11 @@ function wire() {
     if (e.key !== 'Enter' && e.key !== ' ') return;
     const tr = e.target.closest('tr[data-id]'); if (tr) { e.preventDefault(); select(tr.dataset.id); }
   });
-  $('queue').addEventListener('click', e => { const el = e.target.closest('[data-goto]'); if (el) select(el.dataset.goto); });
+  $('queue').addEventListener('click', e => {
+    const ir = e.target.closest('[data-ira]');
+    if (ir) { document.getElementById(ir.dataset.ira)?.scrollIntoView({ behavior: 'smooth', block: 'start' }); return; }
+    const el = e.target.closest('[data-goto]'); if (el) select(el.dataset.goto);
+  });
   $('fVert').addEventListener('change', function () { state.fVert = this.value; renderPipe(); });
   $('fBand').addEventListener('change', function () { state.fBand = this.value; renderPipe(); });
   for (const th of document.querySelectorAll('th.sortable')) {

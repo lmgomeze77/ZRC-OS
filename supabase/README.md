@@ -25,6 +25,8 @@ duplica nada, así que ante la duda, se repasan.
 | `14_checklist_documento.sql` | sí | Un punto apunta al documento que lo cierra. |
 | `15_plazos.sql` | sí | El plazo pasa a ser columna; la cola lleva fecha límite. |
 | `16_actividad.sql` | sí | Registro de quién cambió qué y cuándo. Solo de agregar. |
+| `17_indice.sql` | sí | El índice de riesgo pasa a derivarse de las mesas del barrido. |
+| `18_sectorial.sql` | sí | Atractivo inversor por sector, con rúbricas ancladas. |
 
 Los que no están en el repo contienen metodología propia o expedientes
 reales, y este repositorio es público.
@@ -37,6 +39,14 @@ en blanco. Esa degradación está cubierta por pruebas: el simulador que usan
 los tests acepta `?sindr=1`, `?sindoct=1`, `?sinout=1` y `?sinact=1` para
 fingir cada ausencia. No son parámetros de la aplicación desplegada — ahí la
 ausencia la decide lo que haya en la base.
+
+### `18_sectorial.sql` quiere los expedientes ya cargados
+
+Clasifica a mano los cuatro expedientes cuya vertical dice el tipo de
+mandato y no el sector (`M&A sell-side`, `M&A minoritaria`). Esos `update`
+no hacen nada si el expediente todavía no existe, así que si se aplica
+antes de cargar el pipeline, basta con volver a pasarlo después. Es
+idempotente.
 
 ### Una advertencia sobre `16_actividad.sql`
 

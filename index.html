@@ -762,6 +762,73 @@ table.pipe td select.ck-est { background: var(--panel-2); border: 1px solid var(
 }
 .tbtn:hover { border-color: var(--gold-line); color: var(--cream); }
 
+/* ── MERCADO ──────────────────────────────────────────────────────────
+   Dos columnas en pantalla ancha porque son dos lecturas que se miran
+   juntas, y una debajo de otra en cuanto no caben: apretarlas las hace
+   ilegibles antes que apiladas. */
+.merc-grid { display: grid; gap: 22px; grid-template-columns: minmax(0,.9fr) minmax(0,1.1fr); }
+@media (max-width: 1000px) { .merc-grid { grid-template-columns: 1fr; } }
+.merc-col > .card { height: 100%; }
+.merc-tit { font-family: var(--mono); font-size: 9px; font-weight: 700; letter-spacing: 1.3px;
+  text-transform: uppercase; color: var(--gold); margin-bottom: 4px; }
+.merc-dir { font-family: var(--mono); font-size: 8.5px; letter-spacing: .8px;
+  text-transform: uppercase; color: var(--faint); margin-bottom: 14px; }
+.merc-num { display: flex; align-items: baseline; gap: 10px; margin-bottom: 2px; }
+.merc-val { font-family: var(--display); font-size: 46px; font-weight: 600; line-height: 1;
+  color: var(--cream); font-variant-numeric: tabular-nums; }
+.merc-delta { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+.merc-caduco { border: 1px solid rgba(180,83,9,.35); border-left: 3px solid var(--amber);
+  background: rgba(180,83,9,.06); padding: 11px 13px; margin: 12px 0 0;
+  font-size: 12px; color: var(--text); line-height: 1.5; }
+/* El corte de la serie se dibuja, no se disimula: un hueco de 32 dias
+   unido con una linea recta mentiria sobre lo que se midio. */
+.merc-corte { font-family: var(--mono); font-size: 9px; letter-spacing: .6px;
+  color: var(--amber); margin-top: 8px; }
+.mesa-fila { display: grid; grid-template-columns: 1fr 58px; gap: 10px 12px;
+  align-items: center; padding: 9px 0; border-bottom: 1px solid var(--line-2); }
+.mesa-fila:last-of-type { border-bottom: none; }
+.mesa-nom { font-size: 12.5px; color: var(--text); }
+.mesa-nom small { display: block; font-family: var(--mono); font-size: 9px;
+  color: var(--faint); letter-spacing: .3px; margin-top: 2px; }
+.mesa-val { font-family: var(--mono); font-size: 14px; font-weight: 700; text-align: right;
+  color: var(--cream); font-variant-numeric: tabular-nums; }
+.mesa-fila input[type=range] { grid-column: 1 / -1; width: 100%; accent-color: var(--gold); }
+.mesa-fila input[type=text] { grid-column: 1 / -1; width: 100%; background: var(--panel-2);
+  border: 1px solid var(--line); border-radius: 2px; color: var(--text);
+  font-family: var(--body); font-size: 12px; padding: 7px 9px; }
+.mesa-fila input[type=text]:focus { outline: none; border-color: var(--gold-line); }
+.mesa-sinfund { color: var(--amber); }
+/* Una mesa sin leer no se disfraza de cero ni de cincuenta: se queda en
+   raya, y el deslizador esta donde esta solo porque tiene que estar en
+   algun sitio. */
+.mesa-val.sin-leer { color: var(--faint); font-weight: 400; }
+/* Y el deslizador tampoco: en reposo el navegador lo pinta en oro hasta
+   la mitad, que se lee como un valor puesto y contradice el «—». Apagado
+   hasta que alguien lo toca. */
+.mesa-fila:not([data-leida]) input[type=range],
+.dim-row[data-sdim]:not([data-leida]) input[type=range] { accent-color: var(--faint); opacity: .5; }
+.dim-row[data-sdim]:not([data-leida]) .dim-anchor { font-style: italic; color: var(--faint); }
+
+.sec-tabla { width: 100%; border-collapse: collapse; }
+.sec-tabla th { font-family: var(--mono); font-size: 8.5px; font-weight: 700; letter-spacing: 1.1px;
+  text-transform: uppercase; color: var(--muted); text-align: left;
+  padding: 0 10px 8px 0; border-bottom: 1px solid var(--linea-fuerte); }
+.sec-tabla th.num, .sec-tabla td.num { text-align: right; padding-right: 0; }
+.sec-tabla td { padding: 11px 10px 11px 0; border-bottom: 1px solid var(--line-2); font-size: 12.5px; }
+.sec-tabla tbody tr:last-child td { border-bottom: none; }
+.sec-nom { color: var(--cream); font-weight: 600; }
+.sec-barra { display: block; height: 7px; background: var(--track); border-radius: 4px;
+  overflow: hidden; margin-top: 6px; }
+.sec-barra i { display: block; height: 100%; background: var(--gold); }
+.sec-score { font-family: var(--mono); font-size: 15px; font-weight: 700; color: var(--cream);
+  font-variant-numeric: tabular-nums; }
+.sec-score.es-parcial { color: var(--muted); }
+.sec-sin { font-family: var(--mono); font-size: 9px; color: var(--faint); letter-spacing: .6px; }
+.sec-cob { font-family: var(--mono); font-size: 8.5px; letter-spacing: .6px; color: var(--faint); }
+.sec-cob.es-parcial { color: var(--amber); }
+.sec-exp { font-family: var(--mono); font-size: 12px; color: var(--text); }
+.sec-exp small { color: var(--faint); font-size: 9px; letter-spacing: .5px; }
+
 /* ── ACTIVIDAD ────────────────────────────────────────────────────────
    Cuatro columnas fijas: cuando, quien, que y la operacion. Una linea
    por movimiento, no una tarjeta: lo que se quiere es barrer la columna
@@ -920,8 +987,9 @@ table.pipe td select.ck-est { background: var(--panel-2); border: 1px solid var(
       <a href="#pendientes">03 &middot; PENDIENTES</a>
       <a href="#pipeline">04 &middot; PIPELINE DEALSCORE</a>
       <a href="#pipeline" class="nav-dr" id="navDr">05 &middot; DATA ROOM</a>
-      <a href="#calibracion">06 &middot; CALIBRACI&Oacute;N</a>
-      <a href="#arquitectura">07 &middot; ARQUITECTURA</a>
+      <a href="#mercado">06 &middot; MERCADO</a>
+      <a href="#calibracion">07 &middot; CALIBRACI&Oacute;N</a>
+      <a href="#arquitectura">08 &middot; ARQUITECTURA</a>
     </nav>
   </header>
 
@@ -1011,6 +1079,24 @@ table.pipe td select.ck-est { background: var(--panel-2); border: 1px solid var(
           <div id="drBody"></div>
         </div>
       </div>
+    </div>
+  </section>
+
+  <!-- Mercado: las dos lecturas que no cuelgan de ningun expediente.
+       El indice dice como esta el riesgo hoy; el score sectorial, donde
+       conviene cazar. Ojo a que van en direcciones opuestas, y por eso
+       cada bloque lo dice en su cabecera. -->
+  <section class="section" id="mercado">
+    <div class="sec-head"><h2 class="sec-title">Mercado</h2>
+      <span class="sec-ref" id="mercRef">&mdash;</span></div>
+    <p class="sec-note" style="margin-bottom:22px">
+      Lo que no cuelga de ning&uacute;n expediente. El &iacute;ndice de riesgo describe el momento;
+      el atractivo sectorial, d&oacute;nde conviene originar. Son dos preguntas distintas y
+      por eso son dos n&uacute;meros distintos: ninguno entra en el DEALSCORE.
+    </p>
+    <div class="merc-grid">
+      <div class="merc-col" id="mercIndice"></div>
+      <div class="merc-col" id="mercSector"></div>
     </div>
   </section>
 

@@ -36,6 +36,8 @@ const state = {
   outcomes: [], decisions: [], outError: null,
   miembros: [], accesos: [],
   actividad: [], actError: null,
+  serie: [], riesgo: null, mesas: [], lecturas: [], mercError: null,
+  secScore: [], secPipe: [], secDims: [], secRub: [], secSel: '', secError: null,
   drTab: 'documentos', pane: 'detail', docQ: '', docCat: '', ckPlazo: '', hoyTab: '', nombre: null,
   selected: null, fVert: '', fBand: '', sortKey: 'score', sortDir: -1,
   draft: null
@@ -143,6 +145,51 @@ async function loadAll() {
     state.outError = String(err?.message ?? err);
   }
 
+  // MERCADO · INDICE: opcional, como todo lo que vino despues del
+  // esquema base. Las lecturas se piden solo de los ultimos 30 dias: el
+  // formulario de barrido solo necesita el dia de hoy, y arrastrar la
+  // serie entera de lecturas por mesa no la mira nadie.
+  try {
+    const desde = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
+    const [ser, est, mes, lec] = await Promise.all([
+      sb.from('v_risk_serie').select('*').order('fecha'),
+      sb.from('v_risk_estado').select('*').maybeSingle(),
+      sb.from('risk_mesas').select('*').eq('activa', true).order('orden'),
+      sb.from('risk_lecturas').select('*').gte('fecha', desde)
+    ]);
+    const fallo = [ser, est, mes, lec].find(r => r.error);
+    if (fallo) throw fallo.error;
+    state.serie = ser.data ?? [];
+    state.riesgo = est.data ?? null;
+    state.mesas = mes.data ?? [];
+    state.lecturas = lec.data ?? [];
+    state.mercError = null;
+  } catch (err) {
+    state.serie = []; state.riesgo = null; state.mesas = []; state.lecturas = [];
+    state.mercError = String(err?.message ?? err);
+  }
+
+  // MERCADO · SECTORIAL: opcional y aparte del indice, para que falte
+  // uno sin arrastrar al otro.
+  try {
+    const [sc, pi, di, ru] = await Promise.all([
+      sb.from('v_sector_score').select('*'),
+      sb.from('v_sector_pipeline').select('*'),
+      sb.from('sector_dimensions').select('*').order('orden'),
+      sb.from('sector_rubrics').select('*')
+    ]);
+    const fallo = [sc, pi, di, ru].find(r => r.error);
+    if (fallo) throw fallo.error;
+    state.secScore = sc.data ?? [];
+    state.secPipe = pi.data ?? [];
+    state.secDims = di.data ?? [];
+    state.secRub = ru.data ?? [];
+    state.secError = null;
+  } catch (err) {
+    state.secScore = []; state.secPipe = []; state.secDims = []; state.secRub = [];
+    state.secError = String(err?.message ?? err);
+  }
+
   // ACTIVIDAD: opcional. Los ultimos 200 movimientos de toda la firma; el
   // panel de cada expediente filtra de ahi. Doscientos porque es un
   // registro para mirar que paso ayer, no un archivo historico: eso vive
@@ -248,21 +295,260 @@ function sparkline(serie) {
 }
 
 function tarjetaRiesgo() {
-  if (!state.risk.length) return '';
-  const ult = state.risk[state.risk.length - 1];
-  const prev = state.risk[state.risk.length - 2];
+  // Prefiere la serie compuesta (historico + mesas) si 17_indice.sql ya
+  // esta aplicado; si no, cae a la tabla antigua y sigue funcionando.
+  const serie = state.serie.length ? state.serie : state.risk;
+  if (!serie.length) return '';
+  const ult = serie[serie.length - 1];
+  const prev = serie[serie.length - 2];
   const delta = prev ? ult.valor - prev.valor : 0;
   const flecha = delta === 0 ? '→' : (delta > 0 ? '▲' : '▼');
   const dias = Math.round((Date.now() - new Date(ult.fecha).getTime()) / 86400000);
   return `<div class="stat"><div class="stat-label">Índice de riesgo ZRC</div>
     <div class="stat-value">${ult.valor}<small>${flecha} ${Math.abs(delta)}</small></div>
-    <div class="spark-wrap">${sparkline(state.risk)}</div>
+    <div class="spark-wrap">${sparkline(tramoContinuo(serie).tramo)}</div>
     <div class="spark-legend">
       <span><i style="background:var(--gold)"></i>Publicado</span>
       <span><i style="border:1.2px solid var(--amber)"></i>Degradado</span>
       <span><i style="border:1.2px solid var(--faint)"></i>Reconstruido</span>
     </div>
     <div class="stat-sub">${esc(ult.fecha)}${dias > 2 ? ` · <b style="color:var(--amber)">${dias} días sin actualizar</b>` : ''}</div></div>`;
+}
+
+// ── MERCADO ─────────────────────────────────────────────────────────
+
+// El tramo final de la serie SIN cortes. Unir con una recta un hueco de
+// 32 dias dibujaria una tendencia que nadie midio, y una grafica que
+// miente es peor que no tener grafica.
+function tramoContinuo(serie, maxHueco = 3) {
+  if (serie.length < 2) return { tramo: serie, corte: null };
+  for (let i = serie.length - 1; i > 0; i--) {
+    const d = (new Date(serie[i].fecha) - new Date(serie[i - 1].fecha)) / 86400000;
+    if (d > maxHueco) {
+      return { tramo: serie.slice(i), corte: { dias: Math.round(d), desde: serie[i - 1].fecha } };
+    }
+  }
+  return { tramo: serie, corte: null };
+}
+
+function bloqueIndice() {
+  if (state.mercError) {
+    const falta = /schema cache|does not exist|relation/i.test(state.mercError);
+    return `<div class="card"><div class="merc-tit">Índice de riesgo ZRC</div>
+      <div class="banner" style="margin-top:12px"><b>SIN REACTIVAR</b><br>${falta
+        ? 'Aplica <code>supabase/17_indice.sql</code> en el SQL Editor de Supabase y recarga. Hasta entonces el índice sigue siendo un número suelto que nadie puede reproducir.'
+        : esc(state.mercError)}</div></div>`;
+  }
+  const e = state.riesgo;
+  const { tramo, corte } = tramoContinuo(state.serie);
+  const hoy = new Date().toISOString().slice(0, 10);
+  const leidoHoy = new Map(state.lecturas.filter(l => l.fecha === hoy).map(l => [l.mesa, l]));
+
+  const cabecera = !e ? '<div class="vacio">Sin ninguna lectura todavía.</div>' : `
+    <div class="merc-num">
+      <span class="merc-val">${e.valor}</span>
+      <span class="merc-delta">${e.delta == null ? '' :
+        (e.delta === 0 ? '→ 0' : (e.delta > 0 ? '▲ ' : '▼ ') + Math.abs(e.delta))}
+        · ${esc(e.estado)}${e.cobertura != null ? ` · ${e.cobertura}% de cobertura` : ''}</span>
+    </div>
+    <div class="stat-sub">${esc(e.fecha)} · ${e.dias_serie} días de serie</div>
+    ${tramo.length > 1 ? `<div class="spark-wrap">${sparkline(tramo)}</div>` : ''}
+    ${corte ? `<div class="merc-corte">SERIE CORTADA · ${corte.dias} días sin lectura tras el ${esc(corte.desde)}.
+       No se dibuja el hueco porque no se midió.</div>` : ''}
+    ${e.caducado ? `<p class="merc-caduco"><b>El índice está caducado.</b>
+       Lleva ${e.dias_sin_actualizar} días sin actualizar, así que describe el riesgo de entonces,
+       no el de hoy. El barrido de mesas es lo que lo reactiva.</p>` : ''}`;
+
+  const form = !canWrite() || !state.mesas.length ? '' : `
+    <div class="frm" id="frmMesas">
+      <div class="merc-tit" style="margin-bottom:10px">Barrido de hoy · ${esc(hoy)}</div>
+      <p class="pista" style="font-size:11.5px;color:var(--muted);line-height:1.5;margin-bottom:12px">
+        No hace falta completar las nueve: con las que leas sale número, marcado como parcial.
+        El fundamento es lo que convierte una cifra en una lectura.</p>
+      ${state.mesas.map(m => {
+        const l = leidoHoy.get(m.clave);
+        const v = l ? l.valor : 50;
+        // data-leida solo si ya hay lectura de hoy. Una mesa que nadie
+        // ha tocado NO se envia: el deslizador esta en 50 porque tiene
+        // que estar en algun sitio, no porque alguien haya leido 50.
+        return `<div class="mesa-fila" data-mesa="${esc(m.clave)}"${l ? ' data-leida="1"' : ''}>
+          <div class="mesa-nom">${esc(m.nombre)}<small>${esc(m.descripcion ?? '')}</small></div>
+          <div class="mesa-val${l ? '' : ' sin-leer'}" id="mv-${esc(m.clave)}">${l ? v : '—'}</div>
+          <input type="range" min="0" max="100" step="1" value="${v}"
+                 aria-label="${esc(m.nombre)}, 0 a 100, más es más riesgo" />
+          <input type="text" placeholder="Fundamento: qué has leído y dónde"
+                 value="${esc(l?.fundamento ?? '')}" maxlength="400" />
+        </div>`; }).join('')}
+      <button class="btn-oro" id="mesasSave">GUARDAR BARRIDO</button>
+      <div class="frm-msg" id="mesasMsg"></div>
+    </div>`;
+
+  return `<div class="card">
+    <div class="merc-tit">Índice de riesgo ZRC</div>
+    <div class="merc-dir">0 a 100 · más es MÁS riesgo</div>
+    ${cabecera}${form}</div>`;
+}
+
+function bloqueSectorial() {
+  if (state.secError) {
+    const falta = /schema cache|does not exist|relation/i.test(state.secError);
+    return `<div class="card"><div class="merc-tit">Atractivo inversor por sector</div>
+      <div class="banner" style="margin-top:12px"><b>SIN CARGAR</b><br>${falta
+        ? 'Aplica <code>supabase/18_sectorial.sql</code> en el SQL Editor de Supabase y recarga.'
+        : esc(state.secError)}</div></div>`;
+  }
+  const filas = state.secPipe.map(r => {
+    const parcial = r.cobertura != null && r.cobertura < 100;
+    return `<tr>
+      <td><span class="sec-nom">${esc(r.nombre)}</span>
+        ${r.score != null ? `<span class="sec-barra"><i style="width:${r.score}%"></i></span>` : ''}</td>
+      <td class="num">${r.score == null
+        ? '<span class="sec-sin">SIN LEER</span>'
+        : `<span class="sec-score${parcial ? ' es-parcial' : ''}">${r.score}</span>
+           <div class="sec-cob${parcial ? ' es-parcial' : ''}">${r.cobertura}%${
+             r.caducado ? ' · CADUCADO' : ''}</div>`}</td>
+      <td class="num"><span class="sec-exp">${r.expedientes}</span>${
+        r.por_defecto > 0 ? `<br><small class="sec-cob">${r.por_defecto} POR VERTICAL</small>` : ''}</td>
+    </tr>`; }).join('');
+
+  // Lo que de verdad se viene a mirar aqui: donde hay atractivo sin
+  // expedientes, y donde hay expedientes sin lectura.
+  const sinLeer = state.secPipe.filter(r => r.score == null && r.expedientes > 0);
+  const desatendido = state.secPipe
+    .filter(r => r.score != null && r.score >= 70 && r.expedientes === 0);
+
+  return `<div class="card">
+    <div class="merc-tit">Atractivo inversor por sector · España</div>
+    <div class="merc-dir">0 a 100 · más es MÁS atractivo — al revés que el índice</div>
+    <table class="sec-tabla">
+      <thead><tr><th>Sector</th><th class="num">Atractivo</th><th class="num">Expedientes</th></tr></thead>
+      <tbody>${filas || '<tr><td colspan="3"><span class="sec-sin">SIN SECTORES</span></td></tr>'}</tbody>
+    </table>
+    ${desatendido.length ? `<p class="merc-caduco" style="border-color:rgba(4,120,87,.3);background:rgba(4,120,87,.05);border-left-color:var(--green)">
+      <b>Originación sin hacer.</b> ${esc(desatendido.map(r => r.nombre).join(', '))}
+      ${desatendido.length === 1 ? 'puntúa' : 'puntúan'} alto y no ${desatendido.length === 1 ? 'tiene' : 'tienen'}
+      ningún expediente.</p>` : ''}
+    ${sinLeer.length ? `<p class="act-pie"><b>${sinLeer.reduce((a, r) => a + r.expedientes, 0)} expedientes</b>
+      están en sectores sin lectura (${esc(sinLeer.map(r => r.nombre).join(', '))}): de esos no se sabe
+      si hay comprador.</p>` : ''}
+    ${formSector()}</div>`;
+}
+
+function formSector() {
+  if (!canWrite() || !state.secDims.length) return '';
+  const sectores = state.secPipe.filter(r => r.sector !== '(sin clasificar)');
+  const sel = state.secSel || sectores[0]?.sector || '';
+  const hoy = new Date().toISOString().slice(0, 10);
+  return `<div class="frm" id="frmSector">
+    <div class="merc-tit" style="margin-bottom:10px">Puntuar un sector · ${esc(hoy)}</div>
+    <div class="fld" style="margin-bottom:14px">
+      <label for="secSel">SECTOR</label>
+      <select id="secSel">${sectores.map(r =>
+        `<option value="${esc(r.sector)}"${r.sector === sel ? ' selected' : ''}>${esc(r.nombre)}</option>`).join('')}</select>
+    </div>
+    ${state.secDims.map(d => {
+      const anclas = state.secRub.filter(r => r.dimension === d.clave).sort((a, b) => a.tramo - b.tramo);
+      // Igual que las mesas: una dimension sin tocar no es un tramo 2.
+      return `<div class="dim-row" data-sdim="${esc(d.clave)}">
+        <div class="dim-top">
+          <span class="dim-code">${esc(d.clave)}</span>
+          <span class="dim-name">${esc(d.nombre)}</span>
+          <span class="dim-w">${Math.round(d.peso * 100)}%</span>
+          <span class="dim-val" id="sv-${esc(d.clave)}">—</span></div>
+        <input class="dim-slider" type="range" min="0" max="4" step="1" value="2"
+               aria-label="${esc(d.clave + ' ' + d.nombre)}, tramo 0 a 4" />
+        <div class="dim-anchor" id="sa-${esc(d.clave)}">Mueve el tramo para leer su ancla. Las que no toques no se guardan.</div>
+        <input type="text" class="s-fund" placeholder="Fundamento"
+               maxlength="400" style="width:100%;margin-top:8px;background:var(--panel-2);
+               border:1px solid var(--line);border-radius:2px;color:var(--text);
+               font-family:var(--body);font-size:12px;padding:7px 9px" />
+      </div>`; }).join('')}
+    <button class="btn-oro" id="secSave">GUARDAR LECTURA DEL SECTOR</button>
+    <div class="frm-msg" id="secMsg"></div>
+  </div>`;
+}
+
+function renderMercado() {
+  const e = state.riesgo;
+  $('mercRef').textContent = e
+    ? (e.caducado ? `ÍNDICE CADUCADO · ${e.dias_sin_actualizar} DÍAS` : `ÍNDICE AL ${e.fecha}`)
+    : 'SIN LECTURAS';
+  $('mercIndice').innerHTML = bloqueIndice();
+  $('mercSector').innerHTML = bloqueSectorial();
+  cablearMercado();
+}
+
+function cablearMercado() {
+  // Las mesas: el numero sigue al deslizador en vivo, porque sin eso no
+  // se sabe que se esta poniendo.
+  for (const f of document.querySelectorAll('.mesa-fila')) {
+    const r = f.querySelector('input[type=range]');
+    const v = $('mv-' + f.dataset.mesa);
+    // Mover el deslizador es lo que convierte la mesa en leida.
+    r?.addEventListener('input', () => {
+      f.dataset.leida = '1';
+      if (v) { v.textContent = r.value; v.classList.remove('sin-leer'); }
+    });
+    // Escribir el fundamento tambien cuenta: si alguien justifica un 50,
+    // ese 50 si es una lectura.
+    f.querySelector('input[type=text]')?.addEventListener('input', function () {
+      if (this.value.trim()) {
+        f.dataset.leida = '1';
+        if (v && v.textContent === '—') { v.textContent = r.value; v.classList.remove('sin-leer'); }
+      }
+    });
+  }
+  $('mesasSave')?.addEventListener('click', (ev) => {
+    const hoy = new Date().toISOString().slice(0, 10);
+    const filas = [...document.querySelectorAll('.mesa-fila[data-leida="1"]')].map(f => ({
+      fecha: hoy, mesa: f.dataset.mesa,
+      valor: Number(f.querySelector('input[type=range]').value),
+      fundamento: f.querySelector('input[type=text]').value.trim() || null
+    }));
+    const m = $('mesasMsg');
+    if (!filas.length) {
+      m.className = 'frm-msg err';
+      m.textContent = 'NO HAS LEÍDO NINGUNA MESA. MUEVE AL MENOS UNA: GUARDAR NUEVE CINCUENTAS SERÍA INVENTAR EL BARRIDO.';
+      return;
+    }
+    guardar(m, ev.target,
+      () => sb.from('risk_lecturas').upsert(filas, { onConflict: 'fecha,mesa' }),
+      `BARRIDO GUARDADO · ${filas.length} DE ${state.mesas.length} MESAS.`);
+  });
+
+  // El sector: al mover el tramo cambia el ancla, que es el punto de
+  // tener anclas -- se elige leyendo, no puntuando a ojo.
+  $('secSel')?.addEventListener('change', (e) => { state.secSel = e.target.value; });
+  for (const f of document.querySelectorAll('[data-sdim]')) {
+    const cl = f.dataset.sdim;
+    const r = f.querySelector('input[type=range]');
+    r?.addEventListener('input', () => {
+      const t = Number(r.value);
+      f.dataset.leida = '1';
+      const a = state.secRub.find(x => x.dimension === cl && x.tramo === t);
+      const ea = $('sa-' + cl); if (ea) ea.textContent = a?.texto ?? '';
+      const ev = $('sv-' + cl); if (ev) ev.textContent = t;
+    });
+  }
+  $('secSave')?.addEventListener('click', (ev) => {
+    const sector = $('secSel')?.value;
+    if (!sector) return;
+    const hoy = new Date().toISOString().slice(0, 10);
+    const filas = [...document.querySelectorAll('[data-sdim][data-leida="1"]')].map(f => ({
+      sector, fecha: hoy, dimension: f.dataset.sdim,
+      tramo: Number(f.querySelector('input[type=range]').value),
+      fundamento: f.querySelector('.s-fund').value.trim() || null
+    }));
+    const m = $('secMsg');
+    if (!filas.length) {
+      m.className = 'frm-msg err';
+      m.textContent = 'NO HAS PUNTUADO NINGUNA DIMENSIÓN. ELIGE TRAMO EN AL MENOS UNA.';
+      return;
+    }
+    guardar(m, ev.target,
+      () => sb.from('sector_readings').upsert(filas, { onConflict: 'sector,fecha,dimension' }),
+      `SECTOR PUNTUADO · ${filas.length} DE ${state.secDims.length} DIMENSIONES.`);
+  });
 }
 
 // ── 2 · PENDIENTES ──────────────────────────────────────────────────
@@ -1671,7 +1957,12 @@ function renderArquitectura() {
     ['CAPA 1','Doctrina','Manual del Intelligence Officer: epistemología, rúbricas, playbooks, gobernanza. No es código; es lo que el código tiene que respetar.',
       state.rubrics.length ? ['ok', `✓ ${state.rubrics.length} RÚBRICAS EN BASE`] : ['warn','▲ SIN CARGAR']],
     ['CAPA 2','Señal','ZRC Morning Intelligence: barrido de fuentes, 9 mesas, índice de riesgo.',
-      state.risk.length ? ['ok', `✓ ${state.risk.length} DÍAS DE SERIE`] : ['warn','▲ SIN CARGAR']],
+      (() => {
+        const n = (state.serie.length ? state.serie : state.risk).length;
+        if (!n) return ['warn', '▲ SIN CARGAR'];
+        if (state.riesgo?.caducado) return ['warn', `▲ PARADO ${state.riesgo.dias_sin_actualizar} DÍAS`];
+        return ['ok', `✓ ${n} DÍAS DE SERIE`];
+      })()],
     ['CAPA 3','Memoria','Postgres/Supabase: expedientes, mandatos, puntuaciones, data room y desenlaces, con RLS.',
       state.rows.length ? ['ok', `✓ ${state.rows.length} EXPEDIENTES`] : ['warn','▲ VACÍA']],
     ['CAPA 4','Mando','Esta superficie. Ya no lee de un fichero estático: consulta v_opportunity_scores, v_pendientes y v_dataroom en vivo.',
@@ -1733,7 +2024,7 @@ function renderDealBar() {
     : `${Number(r.dealscore).toFixed(1)} · ${r.banda ?? ''}`.trim();
 }
 
-function renderAll() { renderStats(); renderHoy(); renderQueue(); renderFilters(); renderPipe(); renderDetail(); renderDataroom(); renderCalibracion(); renderArquitectura(); renderDealBar(); }
+function renderAll() { renderStats(); renderHoy(); renderQueue(); renderFilters(); renderPipe(); renderDetail(); renderDataroom(); renderMercado(); renderCalibracion(); renderArquitectura(); renderDealBar(); }
 
 function select(id) { state.selected = id; state.draft = null; renderPipe(); renderDetail(); renderDataroom(); renderDealBar(); $('detail')?.closest('.work-main')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
 

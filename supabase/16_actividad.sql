@@ -32,7 +32,13 @@ create table if not exists activity (
   actor          uuid references auth.users,
   tabla          text not null,
   operacion      text not null check (operacion in ('alta','cambio','baja')),
-  opportunity_id uuid references opportunities on delete cascade,
+  -- on delete SET NULL, no cascade. Con cascade, borrar un expediente se
+  -- llevaba por delante su historial, y eso daba una forma en un paso de
+  -- hacer desaparecer el registro de lo que uno habia hecho: justo lo que
+  -- esta tabla existe para impedir. Al quedarse sin expediente la fila
+  -- pasa a ambito de firma, que es lo que es -- ya no hay reserva que
+  -- aplicar, porque ya no hay expediente.
+  opportunity_id uuid references opportunities on delete set null,
   fila_id        text,
   etiqueta       text,      -- como se llama la fila tocada, en palabras
   campos         text[]     -- que columnas cambiaron (solo en 'cambio')
@@ -41,6 +47,26 @@ create table if not exists activity (
 comment on table activity is
   'Registro de escrituras. Lo escriben disparadores, nunca la aplicacion. '
   'Solo de agregar: no hay politica de update ni de delete.';
+
+-- Si la tabla ya existia con cascade, se corrige aqui. create table if
+-- not exists no habria tocado la restriccion.
+do $$
+declare v_nombre text;
+begin
+  select tc.constraint_name into v_nombre
+    from information_schema.table_constraints tc
+    join information_schema.referential_constraints rc
+      on rc.constraint_name = tc.constraint_name
+   where tc.table_name = 'activity' and tc.constraint_type = 'FOREIGN KEY'
+     and tc.constraint_name like '%opportunity_id%'
+     and rc.delete_rule <> 'SET NULL';
+  if v_nombre is not null then
+    execute format('alter table activity drop constraint %I', v_nombre);
+    execute 'alter table activity add constraint activity_opportunity_id_fkey
+             foreign key (opportunity_id) references opportunities on delete set null';
+    raise notice 'activity.opportunity_id corregido a on delete set null';
+  end if;
+end $$;
 
 create index if not exists activity_opp_idx  on activity (opportunity_id, ocurrido_en desc);
 create index if not exists activity_tiempo_idx on activity (ocurrido_en desc);
@@ -71,6 +97,19 @@ begin
     v_opp := (v_fila ->> 'id')::uuid;
   else
     v_opp := (v_fila ->> 'opportunity_id')::uuid;
+  end if;
+
+  -- El caso que no es obvio: borrar un expediente. El disparador corre
+  -- cuando la fila ya no esta, asi que apuntar a ella violaria la clave
+  -- foranea y el borrado fallaria ENTERO -- no solo el registro. Y no
+  -- pasa solo con opportunities: el borrado en cascada arrastra a
+  -- documentos, checklist y demas, y esos disparadores corren tambien
+  -- con el expediente ya desaparecido. Un guardia de existencia cubre
+  -- los dos casos. El uuid y el nombre se conservan en fila_id y
+  -- etiqueta, que es lo que hace falta para saber que se borro.
+  if tg_op = 'DELETE' and v_opp is not null
+     and not exists (select 1 from opportunities where id = v_opp) then
+    v_opp := null;
   end if;
 
   -- Que columnas cambiaron. Comparar el jsonb entero es generico: no hay

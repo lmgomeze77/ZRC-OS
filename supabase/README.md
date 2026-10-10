@@ -8,13 +8,42 @@ Esquema de la base de datos (Supabase / PostgreSQL 15+).
 
 ## Ficheros
 
+Se aplican en orden de número. Todos son idempotentes: volver a pasarlos no
+duplica nada, así que ante la duda, se repasan.
+
 | Fichero | En el repo | Qué contiene |
 |---|---|---|
 | `01_schema.sql` | sí | Tablas, RLS, políticas, vistas, índices. Sin datos. |
 | `02_modelos.sql` | **no** | Dimensiones, pesos y bandas del modelo de scoring. |
 | `03_seed.sql` | **no** | Expedientes reales. |
+| `06_dataroom.sql` | sí | Documentos, economics, estrategia, inversores, mandatos. |
+| `08_storage.sql` | sí | Cubo privado `expedientes` y políticas por ruta. |
+| `09_doctrina.sql` | sí | Rúbricas ancladas, puertas GO/NO-GO, índice de riesgo. |
+| `11_cola.sql` | sí | `v_pendientes`: qué es lo siguiente, derivado de los datos. |
+| `12_reserva.sql` | sí | Reserva por expediente y reparto de accesos. |
+| `13_checklist.sql` | sí | Puntos de verificación previa por expediente. |
+| `14_checklist_documento.sql` | sí | Un punto apunta al documento que lo cierra. |
+| `15_plazos.sql` | sí | El plazo pasa a ser columna; la cola lleva fecha límite. |
+| `16_actividad.sql` | sí | Registro de quién cambió qué y cuándo. Solo de agregar. |
 
-Se aplican en ese orden.
+Los que no están en el repo contienen metodología propia o expedientes
+reales, y este repositorio es público.
+
+### Qué pasa si falta uno
+
+Nada se cae. La página carga cada tramo por separado y, si sus tablas no
+existen, enseña en su sitio qué fichero falta por aplicar en vez de quedarse
+en blanco. Esa degradación está cubierta por pruebas: el simulador que usan
+los tests acepta `?sindr=1`, `?sindoct=1`, `?sinout=1` y `?sinact=1` para
+fingir cada ausencia. No son parámetros de la aplicación desplegada — ahí la
+ausencia la decide lo que haya en la base.
+
+### Una advertencia sobre `16_actividad.sql`
+
+El registro empieza a existir cuando se aplica. Lo anterior no se puede
+reconstruir, porque la base no guardaba quién había escrito qué: cualquier
+cosa que apareciese ahí fechada antes sería inventada. Por eso el panel lo
+dice en vez de enseñar una lista vacía.
 
 ## El reparto ver / editar
 

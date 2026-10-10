@@ -35,6 +35,7 @@ const state = {
   rubrics: [], gates: [], risk: [], doctError: null,
   outcomes: [], decisions: [], outError: null,
   miembros: [], accesos: [],
+  actividad: [], actError: null,
   drTab: 'documentos', pane: 'detail', docQ: '', docCat: '', ckPlazo: '', hoyTab: '', nombre: null,
   selected: null, fVert: '', fBand: '', sortKey: 'score', sortDir: -1,
   draft: null
@@ -140,6 +141,21 @@ async function loadAll() {
   } catch (err) {
     state.outcomes = []; state.decisions = [];
     state.outError = String(err?.message ?? err);
+  }
+
+  // ACTIVIDAD: opcional. Los ultimos 200 movimientos de toda la firma; el
+  // panel de cada expediente filtra de ahi. Doscientos porque es un
+  // registro para mirar que paso ayer, no un archivo historico: eso vive
+  // en la tabla y se consulta desde el SQL Editor.
+  try {
+    const { data, error } = await sb.from('v_actividad')
+      .select('*').order('ocurrido_en', { ascending: false }).limit(200);
+    if (error) throw error;
+    state.actividad = data ?? [];
+    state.actError = null;
+  } catch (err) {
+    state.actividad = [];
+    state.actError = String(err?.message ?? err);
   }
 
   // DATA ROOM: opcional. Si 06_dataroom.sql no se ha aplicado todavia, sus
@@ -1196,12 +1212,77 @@ function formChecklist(todos) {
   </div>`;
 }
 
+// Los nombres de tabla y de columna son de la base, no de nadie que vaya
+// a leerlos. Lo que no este aqui sale tal cual: preferible un tecnicismo
+// visible a un hueco, porque el hueco no se arregla nunca.
+const ACT_TABLA = {
+  opportunities: 'el expediente', scores: 'una puntuación', documents: 'un documento',
+  checklist_items: 'un punto del checklist', decisions: 'una decisión',
+  outcomes: 'el desenlace', economics: 'los economics', strategy: 'la estrategia',
+  investors: 'un inversor', scope_flags: 'un aviso de ámbito', mandates: 'el mandato',
+  opportunity_access: 'un permiso de acceso'
+};
+const ACT_CAMPO = {
+  estado: 'estado', codigo: 'código', nombre: 'nombre', plaza: 'plaza', geo: 'geografía',
+  vertical: 'vertical', reservado: 'reserva', nota: 'nota', responsable: 'responsable',
+  document_id: 'documento enlazado', vence_en: 'fecha límite', prioridad: 'prioridad',
+  descripcion: 'descripción', titulo: 'título', url: 'enlace', categoria: 'categoría',
+  orden: 'orden', resultado: 'resultado', honorarios_eur: 'honorarios', motivo: 'motivo',
+  fecha: 'fecha', area: 'área', tipo: 'tipo', notas: 'notas'
+};
+const ACT_VERBO = { alta: 'añadió', cambio: 'cambió', baja: 'eliminó' };
+
+// «hace 20 min» se lee de un vistazo; una marca de tiempo completa hay que
+// restarla mentalmente. La fecha exacta va en el title, para quien la
+// necesite.
+function haceCuanto(iso) {
+  const seg = Math.round((Date.now() - new Date(iso)) / 1000);
+  if (seg < 60)      return 'ahora mismo';
+  if (seg < 3600)    return `hace ${Math.round(seg / 60)} min`;
+  if (seg < 86400)   return `hace ${Math.round(seg / 3600)} h`;
+  const d = Math.round(seg / 86400);
+  if (d < 30)        return `hace ${d} d`;
+  return new Date(iso).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
+function drActividad(id) {
+  if (state.actError) {
+    const falta = /schema cache|does not exist|relation/i.test(state.actError);
+    return `<div class="banner"><b>ACTIVIDAD NO DISPONIBLE</b><br>${falta
+      ? 'La tabla todavía no existe en la base. Aplica <code>supabase/16_actividad.sql</code> en el SQL Editor de Supabase y recarga. Solo registra lo que pase <b>a partir de ese momento</b>: lo anterior no se puede reconstruir.'
+      : esc(state.actError)}</div>`;
+  }
+  const filas = state.actividad.filter(a => a.opportunity_id === id);
+  if (!filas.length) return `<div class="vacio">Sin movimientos registrados en este expediente.
+    El registro empieza cuando se aplica <code>16_actividad.sql</code>: lo que se hizo antes no queda,
+    porque reconstruirlo seria inventarselo.</div>`;
+
+  return `<div class="act-lista">${filas.map(a => {
+    const campos = (a.campos ?? []).map(c => ACT_CAMPO[c] ?? c);
+    const que = ACT_TABLA[a.tabla] ?? a.tabla;
+    return `<div class="act-fila">
+      <div class="act-cuando" title="${esc(new Date(a.ocurrido_en).toLocaleString('es-ES'))}">${
+        esc(haceCuanto(a.ocurrido_en))}</div>
+      <div class="act-quien">${esc(a.quien)}</div>
+      <div class="act-que"><b>${ACT_VERBO[a.operacion]}</b> ${esc(que)}${
+        a.etiqueta ? ` · <span class="act-etq">${esc(a.etiqueta)}</span>` : ''}${
+        campos.length ? `<div class="act-campos">${campos.map(c =>
+          `<span class="act-campo">${esc(c)}</span>`).join('')}</div>` : ''}</div>
+      <div class="act-op act-${a.operacion}">${a.operacion}</div>
+    </div>`;
+  }).join('')}</div>
+  <p class="act-pie">Lo escriben disparadores de la base, no esta pantalla: queda registrada toda
+  escritura, venga del navegador o del SQL Editor. El registro es solo de agregar — nadie, ni un
+  administrador, puede reescribirlo.</p>`;
+}
+
 const DR_TABS = [
   ['documentos', 'DOCUMENTACIÓN', drDocumentos],
   ['economics',  'ECONOMICS · MANDATO', drEconomics],
   ['estrategia', 'ESTRATEGIA', drEstrategia],
   ['inversores', 'INVERSORES', drInversores],
-  ['checklist',  'CHECKLIST', drChecklist]
+  ['checklist',  'CHECKLIST', drChecklist],
+  ['actividad',  'ACTIVIDAD', drActividad]
 ];
 
 function renderDataroom() {
@@ -1225,7 +1306,8 @@ function renderDataroom() {
     economics:  state.econ.some(e => e.opportunity_id === r.opportunity_id) ? 1 : 0,
     estrategia: state.strat.some(e => e.opportunity_id === r.opportunity_id) ? 1 : 0,
     inversores: state.outreach.filter(o => o.opportunity_id === r.opportunity_id).length,
-    checklist:  state.check.filter(c => c.opportunity_id === r.opportunity_id).length
+    checklist:  state.check.filter(c => c.opportunity_id === r.opportunity_id).length,
+    actividad:  state.actividad.filter(a => a.opportunity_id === r.opportunity_id).length
   };
 
   $('drTabs').innerHTML = DR_TABS.map(([k, label]) =>

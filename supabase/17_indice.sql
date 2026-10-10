@@ -161,6 +161,16 @@ begin
   end loop;
 end $$;
 
+
+-- Permisos explicitos. Supabase concede select a authenticated por
+-- privilegios por defecto sobre lo que se crea en public, asi que esto
+-- normalmente no hace falta -- pero cuando esos privilegios no estan
+-- como se espera, el sintoma es que la pagina dice "pendiente de
+-- aplicar" sobre algo que SI esta aplicado. Costaba una linea evitarlo.
+grant select on risk_mesas, risk_lecturas to authenticated;
+grant insert, update, delete on risk_mesas, risk_lecturas to authenticated;
+grant select on v_risk_dia, v_risk_serie, v_risk_estado, v_pendientes_firma to authenticated;
+
 -- ── 8 · LAS NUEVE MESAS ─────────────────────────────────────────────
 -- ATENCION: ESTO ES UNA PROPUESTA, NO VUESTRO BARRIDO.
 --

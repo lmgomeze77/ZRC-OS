@@ -207,6 +207,16 @@ begin
   end loop;
 end $$;
 
+
+-- Permisos explicitos. Supabase concede select a authenticated por
+-- privilegios por defecto sobre lo que se crea en public, asi que esto
+-- normalmente no hace falta -- pero cuando esos privilegios no estan
+-- como se espera, el sintoma es que la pagina dice "pendiente de
+-- aplicar" sobre algo que SI esta aplicado. Costaba una linea evitarlo.
+grant select on sectors, sector_map, sector_dimensions, sector_rubrics, sector_readings to authenticated;
+grant insert, update, delete on sectors, sector_map, sector_dimensions, sector_rubrics, sector_readings to authenticated;
+grant select on v_sector_score, v_sector_pipeline to authenticated;
+
 -- ── 9 · LOS SECTORES, SACADOS DE VUESTRO PIPELINE ───────────────────
 -- Siete, no una taxonomia de consultora: cubren los 21 expedientes que
 -- ya hay y nada mas.

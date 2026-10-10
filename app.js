@@ -35,7 +35,7 @@ const state = {
   rubrics: [], gates: [], risk: [], doctError: null,
   outcomes: [], decisions: [], outError: null,
   miembros: [], accesos: [],
-  drTab: 'documentos', pane: 'detail',
+  drTab: 'documentos', pane: 'detail', docQ: '', docCat: '',
   selected: null, fVert: '', fBand: '', sortKey: 'score', sortDir: -1,
   draft: null
 };
@@ -754,33 +754,68 @@ const eur = (n) => n == null ? null
 
 const vacio = (txt) => `<div class="empty-state">${esc(txt)}</div>`;
 
+// Las fichas gastaban una pantalla entera en tres documentos, cada una
+// con un boton de oro a todo lo ancho: el acento de la firma puesto a
+// decir "abrir". Un data room se consulta, no se hojea, asi que va en
+// tabla densa, con buscador y el abrir como enlace discreto.
+const DOC_EST = { disponible:'Disponible', pendiente:'Pendiente', solicitado:'Solicitado' };
+
+function fuenteDe(d) {
+  if (d.storage_path) return { clase: 'fichero', texto: 'FICHERO',
+    detalle: `${d.nombre_fichero ?? ''}${d.bytes ? ' · ' + pesa(d.bytes) : ''}` };
+  if (d.url) return { clase: 'enlace', texto: 'ENLACE', detalle: 'externo' };
+  return { clase: 'hueco', texto: 'SIN FUENTE', detalle: 'hueco declarado' };
+}
+
 function drDocumentos(id) {
   const ds = state.docs.filter(d => d.opportunity_id === id);
-  if (!ds.length) return vacio('Sin documentación cargada para este expediente.');
-  const cats = [...new Set(ds.map(d => d.categoria))];
-  return cats.map(c => {
-    const items = ds.filter(d => d.categoria === c);
-    return `<div class="dr-cat">${esc(CATS[c] ?? c)} · ${items.length}</div>
-      <div class="dr-grid">${items.map(d => `
-        <article class="doc">
-          <div><h4>${esc(d.titulo)}</h4>${d.descripcion ? `<p>${esc(d.descripcion)}</p>` : ''}</div>
-          <div>
-            ${d.storage_path
-              ? `<button class="doc-abrir" data-abrir="${esc(d.storage_path)}">ABRIR FICHERO</button>
-                 <div class="doc-meta">${esc(d.nombre_fichero ?? '')}${d.bytes ? ' · ' + pesa(d.bytes) : ''}</div>`
-              : d.url
-              ? `<a href="${esc(d.url)}" target="_blank" rel="noopener">ABRIR ENLACE</a>`
-              : `<div class="pend">▲ ${esc(String(d.estado).toUpperCase())}</div>
-                 ${canWrite() ? `<label class="doc-adj">
-                   <input type="file" data-adj="${esc(d.id)}" accept=".${EXT_OK.join(',.')}" />
-                   ADJUNTAR FICHERO</label>
-                   <div class="frm-msg" id="adj-${esc(d.id)}"></div>` : ''}`}
-            ${canWrite() ? `<div class="fila-acc" style="margin-top:9px">
-              <button class="btn-mini" data-del-doc="${esc(d.id)}"${
-                d.storage_path ? ` data-ruta="${esc(d.storage_path)}"` : ''}>ELIMINAR</button></div>` : ''}
-          </div>
-        </article>`).join('')}</div>`;
-  }).join('') + formDocumento();
+  if (!ds.length && !canWrite()) return vacio('Sin documentación cargada para este expediente.');
+
+  const q = (state.docQ ?? '').toLowerCase();
+  const vis = ds.filter(d =>
+    (!state.docCat || d.categoria === state.docCat) &&
+    (!q || `${d.titulo} ${d.descripcion ?? ''} ${d.nombre_fichero ?? ''}`.toLowerCase().includes(q)));
+
+  const cats = [...new Set(ds.map(d => d.categoria))].sort();
+  const conFuente = ds.filter(d => d.storage_path || d.url).length;
+
+  const cab = `<div class="ck-cab">
+    <input id="docQ" type="search" placeholder="Buscar documento…" value="${esc(state.docQ ?? '')}" />
+    <select id="docCat"><option value="">TODAS LAS CATEGORÍAS</option>${
+      cats.map(c => `<option value="${esc(c)}"${c === state.docCat ? ' selected' : ''}>${
+        esc((CATS[c] ?? c).toUpperCase())}</option>`).join('')}</select>
+    <span class="toolbar-count">${vis.length} DE ${ds.length} · ${conFuente} CON FUENTE</span>
+  </div>`;
+
+  const filas = vis.map(d => {
+    const f = fuenteDe(d);
+    const abrir = d.storage_path
+      ? `<button class="doc-abrir" data-abrir="${esc(d.storage_path)}">ABRIR</button>`
+      : d.url ? `<a class="doc-abrir" href="${esc(d.url)}" target="_blank" rel="noopener">ABRIR</a>`
+      : canWrite() ? `<label class="doc-adj">
+          <input type="file" data-adj="${esc(d.id)}" accept=".${EXT_OK.join(',.')}" />ADJUNTAR</label>` : '';
+    return `<tr>
+      <td><div class="td-name">${esc(d.titulo)}</div>
+        ${d.descripcion ? `<div class="td-code">${esc(d.descripcion)}</div>` : ''}
+        <div class="frm-msg" id="adj-${esc(d.id)}"></div></td>
+      <td><span class="td-code">${esc(CATS[d.categoria] ?? d.categoria)}</span></td>
+      <td><span class="doc-fuente f-${f.clase}">${f.texto}</span>
+        <div class="doc-meta">${esc(f.detalle)}</div></td>
+      <td><span class="td-code e-${esc(d.estado)}">${esc(DOC_EST[d.estado] ?? d.estado)}</span></td>
+      <td class="doc-acc">${abrir}${canWrite()
+        ? `<button class="btn-mini" data-del-doc="${esc(d.id)}"${
+            d.storage_path ? ` data-ruta="${esc(d.storage_path)}"` : ''}>ELIMINAR</button>` : ''}</td>
+    </tr>`;
+  }).join('');
+
+  const tabla = vis.length
+    ? `<div class="table-scroll"><table class="pipe"><thead><tr>
+        <th>Documento</th><th>Categoría</th><th>Fuente</th><th>Estado</th><th></th>
+      </tr></thead><tbody>${filas}</tbody></table></div>`
+    : vacio(ds.length ? 'Ningún documento coincide con el filtro.'
+                      : 'Sin documentación cargada para este expediente.');
+
+  return cab + tabla + formDocumento();
 }
 
 function formDocumento() {
@@ -1088,6 +1123,18 @@ function renderDataroom() {
 }
 
 function cablearChecklist(id) {
+  // El buscador no repinta en cada tecla: perderia el foco. Repinta al
+  // soltar la tecla y devuelve el cursor donde estaba.
+  const q = $('docQ');
+  if (q) q.addEventListener('input', function () {
+    const pos = this.selectionStart;
+    state.docQ = this.value;
+    renderDataroom();
+    const otra = $('docQ');
+    if (otra) { otra.focus(); otra.setSelectionRange(pos, pos); }
+  });
+  $('docCat')?.addEventListener('change', function () { state.docCat = this.value; renderDataroom(); });
+
   $('ckPrio')?.addEventListener('change', function () { state.ckPrio = this.value; renderDataroom(); });
   $('ckEst') ?.addEventListener('change', function () { state.ckEst  = this.value; renderDataroom(); });
   for (const sel of document.querySelectorAll('.ck-est')) {

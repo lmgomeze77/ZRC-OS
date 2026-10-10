@@ -617,6 +617,19 @@ table.pipe td select.ck-est { background: var(--panel-2); border: 1px solid var(
 
 /* Abrir un fichero del cubo no es un enlace: es una peticion de URL
    firmada. Se parece a un enlace porque hace lo mismo para el que mira. */
+.doc-fuente { font-family: var(--mono); font-size: 8px; font-weight: 700; letter-spacing: 1px;
+  padding: 2px 6px; border: 1px solid; border-radius: 2px; }
+.doc-fuente.f-fichero { color: var(--cyan); border-color: rgba(79,182,214,.4); }
+.doc-fuente.f-enlace  { color: var(--text); border-color: var(--line-2); }
+.doc-fuente.f-hueco   { color: var(--amber); border-color: rgba(251,191,36,.35); }
+.doc-acc { white-space: nowrap; text-align: right; }
+.doc-acc > * { margin-left: 10px; }
+.ck-cab input[type=search] {
+  background: var(--panel-2); border: 1px solid var(--line); border-radius: 2px;
+  color: var(--text); font-family: var(--mono); font-size: 10px; letter-spacing: .6px;
+  padding: 7px 10px; min-width: 220px; }
+.ck-cab input[type=search]:focus { outline: none; border-color: rgba(201,168,76,.45); }
+
 .doc-abrir { background: none; border: none; padding: 0; cursor: pointer;
   font-family: var(--mono); font-size: 9.5px; font-weight: 700; letter-spacing: 1.1px;
   color: var(--cyan); text-transform: uppercase; }

@@ -762,6 +762,15 @@ table.pipe td select.ck-est { background: var(--panel-2); border: 1px solid var(
 }
 .tbtn:hover { border-color: var(--gold-line); color: var(--cream); }
 
+/* El alta es la unica accion de la barra que CREA algo, y no puede
+   leerse igual que un filtro. Se separa a la derecha y lleva el oro. */
+.tbtn-alta { margin-left: auto; border-color: var(--gold) !important; color: var(--gold) !important; }
+.tbtn-alta:hover { background: var(--gold-soft) !important; color: var(--gold-hi) !important; }
+.tbtn-alta[aria-expanded="true"] { background: var(--gold) !important; color: #fff !important;
+  border-color: var(--gold-hi) !important; }
+@media (max-width: 720px) { .tbtn-alta { margin-left: 0; width: 100%; } }
+.alta-aviso { grid-column: 1 / -1; margin-top: -4px; }
+
 /* ── MERCADO ──────────────────────────────────────────────────────────
    Dos columnas en pantalla ancha porque son dos lecturas que se miran
    juntas, y una debajo de otra en cuanto no caben: apretarlas las hace
@@ -1066,7 +1075,12 @@ table.pipe td select.ck-est { background: var(--panel-2); border: 1px solid var(
         <option value="NONE">SIN PUNTUAR</option>
       </select>
       <span class="toolbar-count" id="pipeCount">&mdash;</span>
+      <!-- El alta vive aqui, no en una pantalla aparte: originar es mirar
+           el pipeline y anadirle algo, no irse a otro sitio. -->
+      <button class="tbtn tbtn-alta" id="oNuevo" aria-expanded="false"
+              aria-controls="frmAlta">+ NUEVO EXPEDIENTE</button>
     </div>
+    <div id="frmAlta"></div>
     <div class="work">
       <div class="work-list">
         <div class="table-scroll">

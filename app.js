@@ -38,6 +38,7 @@ const state = {
   actividad: [], actError: null,
   serie: [], riesgo: null, mesas: [], lecturas: [], pendFirma: [], mercError: null,
   secScore: [], secPipe: [], secDims: [], secRub: [], secSel: '', secError: null,
+  altaAbierta: false, altaDup: null, altaCreado: null,
   drTab: 'documentos', pane: 'detail', docQ: '', docCat: '', ckPlazo: '', hoyTab: '', nombre: null,
   selected: null, fVert: '', fBand: '', sortKey: 'score', sortDir: -1,
   draft: null
@@ -333,6 +334,117 @@ function tarjetaRiesgo() {
       <span><i style="border:1.2px solid var(--faint)"></i>Reconstruido</span>
     </div>
     <div class="stat-sub">${esc(ult.fecha)}${dias > 2 ? ` · <b style="color:var(--amber)">${dias} días sin actualizar</b>` : ''}</div></div>`;
+}
+
+// ── ALTA DE EXPEDIENTE ──────────────────────────────────────────────
+// Hasta ahora los 21 expedientes habian entrado por SQL: originar algo
+// un lunes exigia abrir el SQL Editor. Para una plataforma de trabajo
+// cuyo primer proposito es la originacion, ese era el hueco gordo.
+
+const ESTADOS = {
+  originacion: 'Originación', cualificacion: 'Cualificación', mandato: 'Mandato'
+};
+// §12.3. Se valida aqui ADEMAS de en la base: la restriccion de Postgres
+// rechaza con un mensaje de constraint que no le dice nada a nadie.
+const PATRON_CODIGO = /^ZRC-[A-Z]{2,4}-[0-9]{4}-[A-Z]{2,4}-[0-9]{2}$/;
+
+function formAlta() {
+  if (!state.altaAbierta || !canWrite()) return '';
+  // Sugerencias de lo que ya existe, en vez de un campo libre a secas:
+  // es lo que evita la quinta grafia de "Inmobiliario".
+  const verts = [...new Set(state.rows.map(r => r.vertical).filter(Boolean))].sort();
+  const geos  = [...new Set(state.rows.map(r => r.geo).filter(Boolean))].sort();
+  const secs  = state.secPipe.filter(x => x.sector !== '(sin clasificar)');
+  return `<div class="frm" id="altaFrm">
+    <h4>Nuevo expediente</h4>
+    <div class="frm-grid">
+      ${campo('oNom','Nombre','text','maxlength="200" placeholder="Como se le llama dentro de la firma"')}
+      ${campo('oPlaza','Plaza','text','maxlength="120" placeholder="Madrid, Segorbe…"')}
+      <div class="fld"><label for="oVert">Vertical</label>
+        <input id="oVert" type="text" list="oVerts" maxlength="120" placeholder="Inmobiliario, Agro…" />
+        <datalist id="oVerts">${verts.map(v => `<option value="${esc(v)}"></option>`).join('')}</datalist></div>
+      <div class="fld"><label for="oGeo">Geografía</label>
+        <input id="oGeo" type="text" list="oGeos" maxlength="8" placeholder="ES" />
+        <datalist id="oGeos">${geos.map(g => `<option value="${esc(g)}"></option>`).join('')}</datalist></div>
+      ${secs.length ? `<div class="fld"><label for="oSec">Sector</label>
+        <select id="oSec"><option value="">— deducir de la vertical —</option>${secs.map(x =>
+          `<option value="${esc(x.sector)}">${esc(x.nombre)}</option>`).join('')}</select></div>` : ''}
+      <div class="fld"><label for="oEst">Estado</label>
+        <select id="oEst">${opciones(ESTADOS, 'originacion')}</select></div>
+      ${campo('oCod','Código (opcional)','text','maxlength="40" placeholder="ZRC-AGR-2026-ES-01" style="text-transform:uppercase"')}
+      <div class="fld ancho alta-aviso"><div class="pista">
+        El código sigue el patrón <code>ZRC-[TIPO]-[AÑO]-[GEO]-[NN]</code> del §12.3.
+        Déjalo vacío si todavía no toca: el expediente entra igual y aparece en Pendientes
+        hasta que lo tenga. Inventarlo para quitarse el aviso es peor que no tenerlo.</div></div>
+    </div>
+    <button class="btn-oro" id="oGuardar">DAR DE ALTA</button>
+    <div class="frm-msg" id="oMsg"></div>
+  </div>`;
+}
+
+function renderAlta() {
+  const b = $('oNuevo');
+  if (b) {
+    b.hidden = !canWrite();
+    b.setAttribute('aria-expanded', String(!!state.altaAbierta));
+    b.textContent = state.altaAbierta ? '× CANCELAR' : '+ NUEVO EXPEDIENTE';
+  }
+  const c = $('frmAlta');
+  if (!c) return;
+  c.innerHTML = formAlta();
+  if (!state.altaAbierta) return;
+  $('oNom')?.focus();
+
+  $('oGuardar')?.addEventListener('click', async (ev) => {
+    const m = $('oMsg');
+    const falla = (t) => { m.className = 'frm-msg err'; m.textContent = t; };
+    const nombre = val('oNom'), vertical = val('oVert'), geo = val('oGeo').toUpperCase();
+    const codigo = val('oCod').toUpperCase().trim();
+
+    // Las tres validaciones que la base tambien hace, pero diciendolo en
+    // castellano antes de gastar una ida y vuelta.
+    if (!nombre)   return falla('EL NOMBRE ES OBLIGATORIO.');
+    if (!vertical) return falla('LA VERTICAL ES OBLIGATORIA: DETERMINA EL PLAYBOOK.');
+    if (!geo)      return falla('LA GEOGRAFÍA ES OBLIGATORIA.');
+    if (codigo && !PATRON_CODIGO.test(codigo))
+      return falla('EL CÓDIGO NO SIGUE EL PATRÓN ZRC-[TIPO]-[AÑO]-[GEO]-[NN]. DÉJALO VACÍO SI NO LO TIENES.');
+
+    // Con 21 expedientes es facil volver a dar de alta uno que ya esta.
+    // Se avisa en vez de crear el duplicado, y confirmando se crea.
+    const igual = state.rows.find(r =>
+      String(r.nombre).trim().toLowerCase() === nombre.toLowerCase());
+    if (igual && state.altaDup !== nombre.toLowerCase()) {
+      state.altaDup = nombre.toLowerCase();
+      return falla('YA EXISTE UN EXPEDIENTE CON ESE NOMBRE. PULSA OTRA VEZ SI AUN ASÍ QUIERES CREARLO.');
+    }
+    if (codigo && state.rows.some(r => r.codigo === codigo))
+      return falla('ESE CÓDIGO YA ESTÁ EN USO POR OTRO EXPEDIENTE.');
+
+    const uid = (await sb.auth.getUser()).data.user?.id ?? null;
+    const fila = {
+      nombre, vertical, geo, codigo: codigo || null,
+      plaza: val('oPlaza') || null, estado: val('oEst') || 'originacion',
+      creado_por: uid
+    };
+    // sector solo si 18_sectorial.sql esta aplicado y se ha elegido uno.
+    const sec = $('oSec')?.value;
+    if (sec) fila.sector = sec;
+
+    await guardar(m, ev.target, async () => {
+      const { data, error } = await sb.from('opportunities').insert(fila).select('id').single();
+      if (!error) state.altaCreado = data?.id ?? null;
+      return { error };
+    }, 'EXPEDIENTE DADO DE ALTA.');
+
+    // Si salio bien, se cierra el formulario y se abre lo recien creado:
+    // dar de alta y ponerse a trabajar son el mismo gesto.
+    if (state.altaCreado) {
+      const id = state.altaCreado;
+      state.altaCreado = null; state.altaAbierta = false; state.altaDup = null;
+      renderAlta();
+      if (state.rows.some(r => r.opportunity_id === id)) select(id);
+    }
+  });
 }
 
 // ── MERCADO ─────────────────────────────────────────────────────────
@@ -2047,7 +2159,7 @@ function renderDealBar() {
     : `${Number(r.dealscore).toFixed(1)} · ${r.banda ?? ''}`.trim();
 }
 
-function renderAll() { renderStats(); renderHoy(); renderQueue(); renderFilters(); renderPipe(); renderDetail(); renderDataroom(); renderMercado(); renderCalibracion(); renderArquitectura(); renderDealBar(); }
+function renderAll() { renderStats(); renderHoy(); renderQueue(); renderFilters(); renderPipe(); renderDetail(); renderDataroom(); renderAlta(); renderMercado(); renderCalibracion(); renderArquitectura(); renderDealBar(); }
 
 function select(id) { state.selected = id; state.draft = null; renderPipe(); renderDetail(); renderDataroom(); renderDealBar(); $('detail')?.closest('.work-main')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
 
@@ -2061,6 +2173,9 @@ function wire() {
     const ir = e.target.closest('[data-ira]');
     if (ir) { document.getElementById(ir.dataset.ira)?.scrollIntoView({ behavior: 'smooth', block: 'start' }); return; }
     const el = e.target.closest('[data-goto]'); if (el) select(el.dataset.goto);
+  });
+  $('oNuevo')?.addEventListener('click', () => {
+    state.altaAbierta = !state.altaAbierta; state.altaDup = null; renderAlta();
   });
   $('fVert').addEventListener('change', function () { state.fVert = this.value; renderPipe(); });
   $('fBand').addEventListener('change', function () { state.fBand = this.value; renderPipe(); });

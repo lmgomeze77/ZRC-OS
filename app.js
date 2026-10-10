@@ -35,7 +35,7 @@ const state = {
   rubrics: [], gates: [], risk: [], doctError: null,
   outcomes: [], decisions: [], outError: null,
   miembros: [], accesos: [],
-  drTab: 'documentos', pane: 'detail', docQ: '', docCat: '',
+  drTab: 'documentos', pane: 'detail', docQ: '', docCat: '', ckPlazo: '',
   selected: null, fVert: '', fBand: '', sortKey: 'score', sortDir: -1,
   draft: null
 };
@@ -257,11 +257,34 @@ const MOTIVO = {
   banda_alta:          ['Banda alta', 'La acción y el plazo los fija la banda.'],
   checklist_critico:   ['Checklist crítico', 'Validar antes de abrir la sala de datos.'],
   sin_codigo:          ['Sin código de expediente', 'Asignar código con el patrón del manual (§12.3).'],
-  sin_puntuar:         ['Sin puntuar', 'Puntuar contra las rúbricas ancladas.']
+  sin_puntuar:         ['Sin puntuar', 'Puntuar contra las rúbricas ancladas.'],
+  checklist_vencido:   ['Checklist vencido', 'Pasó la fecha comprometida y el punto sigue abierto.']
+};
+
+// El reloj, en una sola pieza: lo usan la cola y el checklist y tienen
+// que decir lo mismo. Devuelve null cuando no hay fecha, porque no
+// tenerla no es estar a tiempo.
+function reloj(fecha) {
+  if (!fecha) return null;
+  const hoy = new Date(); hoy.setHours(0,0,0,0);
+  const d = new Date(fecha + 'T00:00:00');
+  const dias = Math.round((d - hoy) / 86400000);
+  if (dias < 0)  return { clase:'vencido', texto:`VENCIDO · ${-dias} d`, dias };
+  if (dias === 0) return { clase:'hoy',     texto:'VENCE HOY', dias };
+  if (dias <= 7)  return { clase:'pronto',  texto:`${dias} d`, dias };
+  return { clase:'holgado', texto:`${dias} d`, dias };
+}
+const pastillaReloj = (f) => {
+  const r = reloj(f);
+  return r ? `<span class="reloj r-${r.clase}">${esc(r.texto)}</span>` : '';
 };
 
 function renderQueue() {
-  const items = [...state.pend].sort((a,b) => a.prioridad - b.prioridad).slice(0, 8);
+  // Dentro de la misma prioridad manda el reloj: lo vencido primero, y
+  // lo que no tiene fecha al final de su grupo.
+  const items = [...state.pend].sort((a, b) =>
+    a.prioridad - b.prioridad ||
+    ((reloj(a.vence_en)?.dias ?? 9e3) - (reloj(b.vence_en)?.dias ?? 9e3))).slice(0, 8);
   if (!items.length) { $('queue').innerHTML = '<div class="q-item"><div class="q-rank">—</div><div><div class="q-why">Nada pendiente.</div></div></div>'; return; }
   $('queue').innerHTML = items.map((it, i) => {
     const [titulo, accion] = MOTIVO[it.motivo] ?? [it.motivo, ''];
@@ -276,7 +299,7 @@ function renderQueue() {
       <div><div class="q-title">${esc(it.nombre)}</div>
       <div class="q-why">${esc(it.detalle ?? titulo)}</div>
       <div class="q-act"><b>ACCIÓN</b> · ${esc(accion)}</div></div>
-      <div class="q-side">${lado}</div>
+      <div class="q-side">${lado}${pastillaReloj(it.vence_en)}</div>
     </div>`;
   }).join('');
 }
@@ -994,7 +1017,15 @@ function drChecklist(id) {
 
   const vis = todos.filter(c =>
     (!state.ckPrio || c.prioridad === state.ckPrio) &&
-    (!state.ckEst  || c.estado === state.ckEst));
+    (!state.ckEst  || c.estado === state.ckEst) &&
+    (!state.ckPlazo || (() => {
+      if (c.estado === 'validado') return false;
+      const r = reloj(c.vence_en);
+      if (state.ckPlazo === 'sinfecha') return !r;
+      if (!r) return false;
+      return state.ckPlazo === 'vencido' ? r.dias < 0 : r.dias >= 0 && r.dias <= 7;
+    })()));
+  const vencidos = todos.filter(c => c.estado !== 'validado' && (reloj(c.vence_en)?.dias ?? 9e3) < 0).length;
 
   const opc = (m, sel) => Object.entries(m)
     .map(([k,t]) => `<option value="${esc(k)}"${k===sel?' selected':''}>${esc(t)}</option>`).join('');
@@ -1002,8 +1033,11 @@ function drChecklist(id) {
   const cab = `<div class="ck-cab">
     <select id="ckPrio"><option value="">TODAS LAS PRIORIDADES</option>${opc(CK_PRIO, state.ckPrio)}</select>
     <select id="ckEst"><option value="">TODOS LOS ESTADOS</option>${opc(CK_EST, state.ckEst)}</select>
+    <select id="ckPlazo"><option value="">CUALQUIER PLAZO</option>${
+      opc({ vencido:'Vencidos', semana:'Vencen en 7 días', sinfecha:'Sin fecha' }, state.ckPlazo)}</select>
     <span class="toolbar-count">${vis.length} DE ${todos.length}${
-      crit ? ` · <b style="color:var(--red)">${crit} CRÍTICOS ABIERTOS</b>` : ''}</span>
+      crit ? ` · <b style="color:var(--red)">${crit} CRÍTICOS ABIERTOS</b>` : ''}${
+      vencidos ? ` · <b style="color:var(--red)">${vencidos} VENCIDOS</b>` : ''}</span>
     <div class="ck-prog"><b>${val} / ${todos.length} validados</b>
       <div class="ck-bar"><i style="width:${pct}%"></i></div></div>
   </div>`;
@@ -1021,16 +1055,20 @@ function drChecklist(id) {
           c.nota ? 'EDITAR RESPUESTA' : '+ RESPUESTA'}</button>` : ''}</td>
     <td><span class="pill p-${esc(c.prioridad)}">${esc(CK_PRIO[c.prioridad] ?? c.prioridad)}</span></td>
     <td><span class="td-code">${esc(CK_ORIG[c.origen] ?? c.origen)}</span></td>
+    <td>${c.estado === 'validado' ? '<span class="td-code">—</span>'
+         : (pastillaReloj(c.vence_en) || '<span class="td-code">sin fecha</span>')}</td>
     <td>${canWrite()
       ? `<select class="ck-est e-${esc(c.estado)}" data-ck="${esc(c.id)}">${opc(CK_EST, c.estado)}</select>`
       : `<span class="td-code e-${esc(c.estado)}">${esc(CK_EST[c.estado] ?? c.estado)}</span>`}</td>
   </tr>
-  ${canWrite() ? `<tr class="ck-fila-edit" id="cke-${esc(c.id)}" hidden><td colspan="5">
+  ${canWrite() ? `<tr class="ck-fila-edit" id="cke-${esc(c.id)}" hidden><td colspan="6">
     <div class="frm-grid">
       <div class="fld ancho"><label for="ckn-${esc(c.id)}">Respuesta · qué se ha encontrado</label>
         <textarea id="ckn-${esc(c.id)}" placeholder="La cifra, el hallazgo o el documento que responde a este punto.">${esc(c.nota ?? '')}</textarea></div>
       <div class="fld"><label for="ckr-${esc(c.id)}">Responsable</label>
         <input id="ckr-${esc(c.id)}" type="text" value="${esc(c.responsable ?? '')}" placeholder="Quién lo persigue" /></div>
+      <div class="fld"><label for="ckv-${esc(c.id)}">Vence el</label>
+        <input id="ckv-${esc(c.id)}" type="date" value="${esc(c.vence_en ?? '')}" /></div>
       <div class="fld"><label for="ckd-${esc(c.id)}">Documento que lo resuelve</label>
         <select id="ckd-${esc(c.id)}">
           <option value="">— ninguno —</option>
@@ -1043,7 +1081,8 @@ function drChecklist(id) {
     <div class="frm-msg" id="ckm-${esc(c.id)}"></div></td></tr>` : ''}`).join('');
 
   return cab + `<div class="table-scroll"><table class="pipe"><thead><tr>
-    <th>#</th><th>Área · documento o información</th><th>Prioridad</th><th>Origen</th><th>Estado</th>
+    <th>#</th><th>Área · documento o información</th><th>Prioridad</th><th>Origen</th>
+    <th>Vence</th><th>Estado</th>
   </tr></thead><tbody>${filas}</tbody></table></div>` + formChecklist(todos);
 }
 
@@ -1137,6 +1176,7 @@ function cablearChecklist(id) {
 
   $('ckPrio')?.addEventListener('change', function () { state.ckPrio = this.value; renderDataroom(); });
   $('ckEst') ?.addEventListener('change', function () { state.ckEst  = this.value; renderDataroom(); });
+  $('ckPlazo')?.addEventListener('change', function () { state.ckPlazo = this.value; renderDataroom(); });
   for (const sel of document.querySelectorAll('.ck-est')) {
     sel.addEventListener('change', () => guardar(null, null,
       () => sb.from('checklist_items').update({
@@ -1161,6 +1201,7 @@ function cablearChecklist(id) {
         nota: val('ckn-' + k) || null,
         responsable: val('ckr-' + k) || null,
         document_id: val('ckd-' + k) || null,
+        vence_en: val('ckv-' + k) || null,
         actualizado_en: new Date().toISOString()
       }).eq('id', k), 'RESPUESTA GUARDADA.');
     });

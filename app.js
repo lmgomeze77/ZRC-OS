@@ -46,6 +46,23 @@ const canWrite = () => state.rol === 'writer' || state.rol === 'admin';
 
 function banner(html) { $('banner').innerHTML = html ? `<div class="banner">${html}</div>` : ''; }
 
+// Un tramo de SQL sin aplicar NO es un error, y pintarlo en rojo decia
+// que algo se habia roto cuando lo que pasa es que falta un paso de
+// instalacion. Rojo se queda para lo que de verdad ha fallado; esto es
+// un recado, y lo parece.
+//
+// Recibe el error tal cual y decide: si Postgres dice que la relacion no
+// existe, es que falta el fichero; cualquier otra cosa si es un fallo.
+function avisoModulo(err, titulo, fichero, explica) {
+  const falta = /schema cache|does not exist|relation/i.test(err);
+  if (!falta) return `<div class="banner"><b>${esc(titulo)}</b><br>${esc(err)}</div>`;
+  return `<div class="pendiente">
+    <b>PENDIENTE DE APLICAR</b>
+    <p>${explica} Aplica <code>supabase/${esc(fichero)}</code> en el SQL Editor de Supabase y recarga.</p>
+    <p class="pendiente-pie">El resto del cuadro de mando funciona sin esto.</p>
+  </div>`;
+}
+
 // ── ACCESO ──────────────────────────────────────────────────────────
 async function sendLink() {
   const email = $('email').value.trim();
@@ -336,11 +353,9 @@ function tramoContinuo(serie, maxHueco = 3) {
 
 function bloqueIndice() {
   if (state.mercError) {
-    const falta = /schema cache|does not exist|relation/i.test(state.mercError);
     return `<div class="card"><div class="merc-tit">Índice de riesgo ZRC</div>
-      <div class="banner" style="margin-top:12px"><b>SIN REACTIVAR</b><br>${falta
-        ? 'Aplica <code>supabase/17_indice.sql</code> en el SQL Editor de Supabase y recarga. Hasta entonces el índice sigue siendo un número suelto que nadie puede reproducir.'
-        : esc(state.mercError)}</div></div>`;
+      ${avisoModulo(state.mercError, 'ÍNDICE NO DISPONIBLE', '17_indice.sql',
+        'Hasta que se aplique, el índice sigue siendo un número suelto que nadie puede reproducir ni rellenar a medias.')}</div>`;
   }
   const e = state.riesgo;
   const { tramo, corte } = tramoContinuo(state.serie);
@@ -394,11 +409,9 @@ function bloqueIndice() {
 
 function bloqueSectorial() {
   if (state.secError) {
-    const falta = /schema cache|does not exist|relation/i.test(state.secError);
     return `<div class="card"><div class="merc-tit">Atractivo inversor por sector</div>
-      <div class="banner" style="margin-top:12px"><b>SIN CARGAR</b><br>${falta
-        ? 'Aplica <code>supabase/18_sectorial.sql</code> en el SQL Editor de Supabase y recarga.'
-        : esc(state.secError)}</div></div>`;
+      ${avisoModulo(state.secError, 'SECTORIAL NO DISPONIBLE', '18_sectorial.sql',
+        'Trae los siete sectores, sus rúbricas ancladas y el cruce con el pipeline.')}</div>`;
   }
   const filas = state.secPipe.map(r => {
     const parcial = r.cobertura != null && r.cobertura < 100;
@@ -1267,7 +1280,8 @@ function formDocumento() {
 function drEconomics(id) {
   const e = state.econ.find(x => x.opportunity_id === id);
   const m = state.mand.filter(x => x.opportunity_id === id && x.estado === 'vivo')[0];
-  if (!e && !m) return vacio('Sin economics ni mandato registrados todavía.');
+  if (!e && !m) return vacio('Sin economics ni mandato registrados todavía.')
+                      + formEconomics(id, null);
   const fila = (k, v) => `<dt>${k}</dt><dd${v == null ? ' class="vacio"' : ''}>${v ?? 'sin registrar'}</dd>`;
   const rango = e && (e.ev_min_eur != null || e.ev_max_eur != null)
     ? `${eur(e.ev_min_eur) ?? '—'} – ${eur(e.ev_max_eur) ?? '—'}` : null;
@@ -1292,7 +1306,7 @@ function formEconomics(id, e) {
   if (!canWrite()) return '';
   const v = (x) => x == null ? '' : x;
   return `<div class="frm">
-    <h4>Editar economics</h4>
+    <h4>${e ? 'Editar' : 'Registrar'} economics</h4>
     <div class="frm-grid">
       ${campo('eMin','EV mínimo (€)','number',`value="${v(e?.ev_min_eur)}"`)}
       ${campo('eMax','EV máximo (€)','number',`value="${v(e?.ev_max_eur)}"`)}
@@ -1342,7 +1356,8 @@ function formEstrategia(id, s) {
 function drInversores(id) {
   const os = state.outreach.filter(x => x.opportunity_id === id)
     .sort((a, b) => (a.prioridad ?? 99) - (b.prioridad ?? 99));
-  if (!os.length) return vacio('Sin inversores potenciales asociados todavía.');
+  if (!os.length) return vacio('Sin inversores potenciales asociados todavía.')
+                       + formInversor();
   return `<div class="table-scroll"><table class="pipe"><thead><tr>
       <th>Inversor</th><th>Tipo</th><th>Ticket</th><th>Estado</th><th>Último contacto</th>
     </tr></thead><tbody>${os.map(o => {
@@ -1405,7 +1420,8 @@ function docDelPunto(c) {
 
 function drChecklist(id) {
   const todos = state.check.filter(c => c.opportunity_id === id);
-  if (!todos.length) return vacio('Sin checklist de preparación para este expediente.');
+  if (!todos.length) return vacio('Sin checklist de preparación para este expediente.')
+                          + formChecklist([]);
 
   const val = todos.filter(c => c.estado === 'validado').length;
   const crit = todos.filter(c => c.prioridad === 'critica' && c.estado !== 'validado').length;
@@ -1546,10 +1562,8 @@ function haceCuanto(iso) {
 
 function drActividad(id) {
   if (state.actError) {
-    const falta = /schema cache|does not exist|relation/i.test(state.actError);
-    return `<div class="banner"><b>ACTIVIDAD NO DISPONIBLE</b><br>${falta
-      ? 'La tabla todavía no existe en la base. Aplica <code>supabase/16_actividad.sql</code> en el SQL Editor de Supabase y recarga. Solo registra lo que pase <b>a partir de ese momento</b>: lo anterior no se puede reconstruir.'
-      : esc(state.actError)}</div>`;
+    return avisoModulo(state.actError, 'ACTIVIDAD NO DISPONIBLE', '16_actividad.sql',
+      'Registra solo lo que pase <b>a partir de entonces</b>: lo anterior no se puede reconstruir, porque la base no lo guardaba.');
   }
   const filas = state.actividad.filter(a => a.opportunity_id === id);
   if (!filas.length) return `<div class="vacio">Sin movimientos registrados en este expediente.
@@ -1591,12 +1605,8 @@ function renderDataroom() {
 
   if (state.drError) {
     $('drTabs').innerHTML = '';
-    const falta = /schema cache|does not exist|relation/i.test(state.drError);
-    $('drBody').innerHTML = `<div class="banner"><b>DATA ROOM NO DISPONIBLE</b><br>${
-      falta
-        ? 'Sus tablas todavía no existen en la base. Aplica <code>supabase/06_dataroom.sql</code> en el SQL Editor de Supabase y recarga.'
-        : esc(state.drError)
-    }</div>`;
+    $('drBody').innerHTML = avisoModulo(state.drError, 'DATA ROOM NO DISPONIBLE', '06_dataroom.sql',
+      'Trae documentos, economics, estrategia, inversores y mandatos.');
     return;
   }
 
@@ -1773,37 +1783,6 @@ function cablearFormularios(id) {
     });
   }
 
-}
-
-// Abrir ficheros NO es una accion de escritura. Vivia dentro de
-// cablearFormularios(), que solo corre para quien puede editar, asi que
-// un lector veia el boton y no hacia nada -- cuando las politicas del
-// cubo si le dejan leer. Se cablea para todos.
-function cablearAperturas() {
-  const noVale = (texto) => {
-    const m = $('dMsg'); if (!m) return alert(texto);
-    m.className = 'frm-msg err'; m.textContent = texto;
-  };
-  // El cubo es privado: no hay enlace permanente. Se pide uno firmado y
-  // con caducidad justo al pulsar. La ventana se abre ANTES de esperar,
-  // porque abrirla despues la bloquea el navegador.
-  for (const b of document.querySelectorAll('[data-abrir]')) {
-    b.addEventListener('click', async () => {
-      // Sin el tercer argumento a proposito: con 'noopener' window.open
-      // devuelve null y el respaldo se llevaba por delante la pestaña
-      // actual, sacando al usuario del cuadro de mando. Se corta el
-      // vinculo despues, que consigue lo mismo sin perder el manejador.
-      const w = window.open('', '_blank');
-      const { data, error } = await sb.storage.from(CUBO)
-        .createSignedUrl(b.dataset.abrir, FIRMA_SEGS);
-      if (error || !data?.signedUrl) {
-        if (w) w.close();
-        return noVale('NO SE PUDO ABRIR: ' + String(error?.message ?? 'sin url').toUpperCase());
-      }
-      if (w) { w.opener = null; w.location = data.signedUrl; }
-      else noVale('EL NAVEGADOR HA BLOQUEADO LA VENTANA. PERMITE LAS EMERGENTES Y REINTENTA.');
-    });
-  }
 
   $('eSave')?.addEventListener('click', (ev) => guardar($('eMsg'), ev.target,
     () => sb.from('economics').upsert({
@@ -1859,6 +1838,37 @@ function cablearAperturas() {
     b.addEventListener('click', (ev) => guardar(null, ev.target,
       () => sb.from('investor_outreach').delete()
         .eq('opportunity_id', id).eq('investor_id', b.dataset.delInv)));
+  }
+}
+
+// Abrir ficheros NO es una accion de escritura. Vivia dentro de
+// cablearFormularios(), que solo corre para quien puede editar, asi que
+// un lector veia el boton y no hacia nada -- cuando las politicas del
+// cubo si le dejan leer. Se cablea para todos.
+function cablearAperturas() {
+  const noVale = (texto) => {
+    const m = $('dMsg'); if (!m) return alert(texto);
+    m.className = 'frm-msg err'; m.textContent = texto;
+  };
+  // El cubo es privado: no hay enlace permanente. Se pide uno firmado y
+  // con caducidad justo al pulsar. La ventana se abre ANTES de esperar,
+  // porque abrirla despues la bloquea el navegador.
+  for (const b of document.querySelectorAll('[data-abrir]')) {
+    b.addEventListener('click', async () => {
+      // Sin el tercer argumento a proposito: con 'noopener' window.open
+      // devuelve null y el respaldo se llevaba por delante la pestaña
+      // actual, sacando al usuario del cuadro de mando. Se corta el
+      // vinculo despues, que consigue lo mismo sin perder el manejador.
+      const w = window.open('', '_blank');
+      const { data, error } = await sb.storage.from(CUBO)
+        .createSignedUrl(b.dataset.abrir, FIRMA_SEGS);
+      if (error || !data?.signedUrl) {
+        if (w) w.close();
+        return noVale('NO SE PUDO ABRIR: ' + String(error?.message ?? 'sin url').toUpperCase());
+      }
+      if (w) { w.opener = null; w.location = data.signedUrl; }
+      else noVale('EL NAVEGADOR HA BLOQUEADO LA VENTANA. PERMITE LAS EMERGENTES Y REINTENTA.');
+    });
   }
 }
 

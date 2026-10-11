@@ -29,6 +29,7 @@ duplica nada, así que ante la duda, se repasan.
 | `18_sectorial.sql` | sí | Atractivo inversor por sector, con rúbricas ancladas. |
 | `21_mesas_reales.sql` | sí | Las nueve mesas del briefing y 49 días reconstruidos. |
 | `22_metodos.sql` | sí | Dos construcciones, dos series: índice de mesas y lectura. |
+| `24_codigo.sql` | sí | El patrón de código admite el `&` del tipo `M&A`. |
 
 ### Ficheros «al día»
 

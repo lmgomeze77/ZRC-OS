@@ -27,7 +27,7 @@ const EXT_OK = ['pdf','doc','docx','xls','xlsx','ppt','pptx','csv','txt','rtf',
 // copia vieja de su cache: eso, y no un despliegue parado, es lo que hace
 // que una actualizacion publicada no se vea. Hay que subir las dos a la
 // vez: esta constante y el ?v= de index.html.
-const VERSION = '2026-10-11b';
+const VERSION = '2026-10-11c';
 const VERSION_PEDIDA = new URL(import.meta.url).searchParams.get('v');
 
 function sellaVersion() {
@@ -64,7 +64,7 @@ const state = {
   altaAbierta: false, altaDup: null, altaCreado: null,
   ingesta: null, ingestaHecha: false,
   drTab: 'documentos', pane: 'detail', docQ: '', docCat: '', ckPlazo: '', hoyTab: '', nombre: null,
-  selected: null, fVert: '', fBand: '', sortKey: 'score', sortDir: -1,
+  selected: null, fVert: '', fBand: '', fSinCod: false, sortKey: 'score', sortDir: -1,
   draft: null
 };
 const canWrite = () => state.rol === 'writer' || state.rol === 'admin';
@@ -475,6 +475,7 @@ function panelCodigo(r) {
       El GEO sale de la plaza y el secuencial es el primero libre. Cámbialos si no cuadran.</div>
     <div class="cod-btns">
       <button class="btn-oro" id="codGuardar">ASIGNAR</button>
+      ${siguienteSinCodigo(r) ? `<button class="tbtn" id="codSeguir">ASIGNAR Y SEGUIR →</button>` : ''}
       <button type="button" class="linkbtn" id="codCerrar">cancelar</button>
     </div>
     <div class="frm-msg" id="codMsg"></div>
@@ -525,16 +526,35 @@ function cablearCodigo(r) {
   $(state.codProp?.tipo ? 'cNN' : 'cTipo')?.focus();
   $(state.codProp?.tipo ? 'cNN' : 'cTipo')?.select();
 
-  $('codGuardar')?.addEventListener('click', async (ev) => {
+  // Asignar los 17 que faltan es una tanda, no un tramite suelto: el
+  // boton de seguir encadena con el siguiente sin codigo y deja el
+  // formulario abierto, asi que cada uno son dos pulsaciones.
+  const asigna = async (ev, seguir) => {
     const codigo = arma();
     if (!PATRON_CODIGO.test(codigo)) return;
+    const sig = seguir ? siguienteSinCodigo(r) : null;
     await guardar($('codMsg'), ev.target, () =>
       sb.from('opportunities').update({ codigo }).eq('id', r.opportunity_id),
       'CÓDIGO ASIGNADO.');
-    if (state.rows.find(x => x.opportunity_id === r.opportunity_id)?.codigo) {
-      state.codAbierto = null; state.codProp = null; renderDetail();
-    }
-  });
+    if (!state.rows.find(x => x.opportunity_id === r.opportunity_id)?.codigo) return;
+    state.codAbierto = null; state.codProp = null;
+    // El siguiente se vuelve a buscar sobre los datos recargados: el que
+    // se habia apuntado puede haberlo codificado otro entretanto.
+    const vivo = sig && state.rows.find(x => x.opportunity_id === sig && !x.codigo);
+    if (vivo) { state.codAbierto = vivo.opportunity_id; state.codProp = proponeCodigo(vivo); select(vivo.opportunity_id); }
+    else renderDetail();
+  };
+  $('codGuardar')?.addEventListener('click', (ev) => asigna(ev, false));
+  $('codSeguir')?.addEventListener('click', (ev) => asigna(ev, true));
+}
+
+// El siguiente sin codigo en el orden que se esta viendo, dando la
+// vuelta. Devuelve null si este es el unico que queda.
+function siguienteSinCodigo(r) {
+  const vis = visibleRows();
+  const i = vis.findIndex(x => x.opportunity_id === r.opportunity_id);
+  const orden = i < 0 ? vis : [...vis.slice(i + 1), ...vis.slice(0, i)];
+  return orden.find(x => !x.codigo)?.opportunity_id ?? null;
 }
 
 function formAlta() {
@@ -1301,6 +1321,7 @@ function renderQueue() {
 function visibleRows() {
   return state.rows.filter(r => {
     if (state.fVert && r.vertical !== state.fVert) return false;
+    if (state.fSinCod && r.codigo) return false;
     if (state.fBand) {
       const b = r.banda ?? 'NONE';
       if (b !== state.fBand) return false;
@@ -2484,6 +2505,16 @@ function renderFilters() {
   sel.innerHTML = '<option value="">TODAS LAS VERTICALES</option>' +
     verts.map(v => `<option value="${esc(v)}">${esc(String(v).toUpperCase())}</option>`).join('');
   sel.value = state.fVert;
+
+  // El filtro lleva la cuenta encima: un boton que dice «sin codigo» sin
+  // decir cuantos obliga a pulsarlo para saber si hace falta.
+  const b = $('fSinCod');
+  if (b) {
+    const n = state.rows.filter(r => !r.codigo).length;
+    b.textContent = `SIN CÓDIGO · ${n}`;
+    b.setAttribute('aria-pressed', String(state.fSinCod));
+    b.disabled = !n && !state.fSinCod;
+  }
 }
 
 function renderCalibracion() {
@@ -2665,6 +2696,9 @@ function wire() {
   });
   $('fVert').addEventListener('change', function () { state.fVert = this.value; renderPipe(); });
   $('fBand').addEventListener('change', function () { state.fBand = this.value; renderPipe(); });
+  $('fSinCod')?.addEventListener('click', () => {
+    state.fSinCod = !state.fSinCod; renderFilters(); renderPipe();
+  });
   for (const th of document.querySelectorAll('th.sortable')) {
     th.addEventListener('click', () => {
       const k = th.dataset.sort;

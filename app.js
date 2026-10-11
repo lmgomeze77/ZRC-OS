@@ -463,6 +463,18 @@ function tramoContinuo(serie, maxHueco = 3) {
   return { tramo: serie, corte: null };
 }
 
+const fechaCorta = (f) => { const d = new Date(f + 'T00:00:00');
+  return String(d.getDate()).padStart(2,'0') + '/' + String(d.getMonth()+1).padStart(2,'0'); };
+
+// La ultima lectura de una mesa ANTERIOR a hoy. Es el contexto que
+// convierte el barrido en "¿ha cambiado algo?" en vez de "rellena nueve
+// cifras desde cero", que es por lo que se dejo de hacer.
+function anteriorDe(clave, hoy) {
+  return state.lecturas
+    .filter(l => l.mesa === clave && l.fecha < hoy)
+    .sort((a, b) => b.fecha.localeCompare(a.fecha))[0] ?? null;
+}
+
 function bloqueIndice() {
   if (state.mercError) {
     return `<div class="card"><div class="merc-tit">Índice de riesgo ZRC</div>
@@ -494,18 +506,28 @@ function bloqueIndice() {
       <div class="merc-tit" style="margin-bottom:10px">Barrido de hoy · ${esc(hoy)}</div>
       <p class="pista" style="font-size:11.5px;color:var(--muted);line-height:1.5;margin-bottom:12px">
         No hace falta completar las nueve: con las que leas sale número, marcado como parcial.
-        El fundamento es lo que convierte una cifra en una lectura.</p>
+        Mirar una mesa y ver que no se ha movido <b>sí es una lectura</b> — para eso está
+        «sin cambio». Lo que no vale es no mirarla.</p>
       ${state.mesas.map(m => {
         const l = leidoHoy.get(m.clave);
-        const v = l ? l.valor : 50;
-        // data-leida solo si ya hay lectura de hoy. Una mesa que nadie
-        // ha tocado NO se envia: el deslizador esta en 50 porque tiene
-        // que estar en algun sitio, no porque alguien haya leido 50.
+        const ant = anteriorDe(m.clave, hoy);
+        // El deslizador arranca en la ultima lectura si la hay: casi
+        // ninguna mesa cambia de un dia para otro, y partir de 50 obliga
+        // a reconstruir a mano lo que ya se sabia. Que arranque ahi no
+        // la da por leida -- eso sigue exigiendo tocarla.
+        const v = l ? l.valor : (ant ? ant.valor : 50);
         return `<div class="mesa-fila" data-mesa="${esc(m.clave)}"${l ? ' data-leida="1"' : ''}>
           <div class="mesa-nom">${esc(m.nombre)}<small>${esc(m.descripcion ?? '')}</small></div>
           <div class="mesa-val${l ? '' : ' sin-leer'}" id="mv-${esc(m.clave)}">${l ? v : '—'}</div>
           <input type="range" min="0" max="100" step="1" value="${v}"
                  aria-label="${esc(m.nombre)}, 0 a 100, más es más riesgo" />
+          ${ant ? `<div class="mesa-ant">
+            <span class="mesa-ant-txt" title="${esc(ant.fundamento ?? 'sin fundamento anotado')}">
+              Última: <b>${ant.valor}</b> el ${esc(fechaCorta(ant.fecha))}${
+                ant.fundamento ? ' · ' + esc(ant.fundamento.slice(0, 64)) + (ant.fundamento.length > 64 ? '…' : '') : ''}</span>
+            <button type="button" class="btn-mini mesa-igual" data-igual="${esc(m.clave)}"
+                    data-valor="${ant.valor}" data-desde="${esc(fechaCorta(ant.fecha))}">SIN CAMBIO</button>
+          </div>` : ''}
           <input type="text" placeholder="Fundamento: qué has leído y dónde"
                  value="${esc(l?.fundamento ?? '')}" maxlength="400" />
         </div>`; }).join('')}
@@ -616,6 +638,19 @@ function cablearMercado() {
     r?.addEventListener('input', () => {
       f.dataset.leida = '1';
       if (v) { v.textContent = r.value; v.classList.remove('sin-leer'); }
+    });
+    // Confirmar que no se ha movido es una lectura con todas las letras,
+    // y deja dicho en el fundamento que se reviso y desde cuando. A
+    // proposito NO hay un boton de "todas sin cambio": eso convertiria
+    // el barrido en un clic y volveria a llenar la serie de dias que
+    // nadie miro, que es de lo que venimos.
+    f.querySelector('.mesa-igual')?.addEventListener('click', function () {
+      const txt = f.querySelector('input[type=text]');
+      r.value = this.dataset.valor;
+      if (!txt.value.trim()) txt.value = 'Sin cambio desde el ' + this.dataset.desde + '.';
+      f.dataset.leida = '1';
+      if (v) { v.textContent = r.value; v.classList.remove('sin-leer'); }
+      f.classList.add('es-igual');
     });
     // Escribir el fundamento tambien cuenta: si alguien justifica un 50,
     // ese 50 si es una lectura.

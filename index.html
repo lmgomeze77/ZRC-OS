@@ -829,6 +829,20 @@ table.pipe td select.ck-est { background: var(--panel-2); border: 1px solid var(
    raya, y el deslizador esta donde esta solo porque tiene que estar en
    algun sitio. */
 .mesa-val.sin-leer { color: var(--faint); font-weight: 400; }
+/* La ultima lectura, como contexto del barrido de hoy. Va entre el
+   deslizador y el fundamento porque es lo que se mira justo antes de
+   decidir si la mesa se ha movido. */
+.mesa-ant { grid-column: 1 / -1; display: flex; align-items: center; gap: 10px;
+  flex-wrap: wrap; margin-top: -2px; }
+.mesa-ant-txt { font-family: var(--mono); font-size: 9px; letter-spacing: .3px;
+  color: var(--faint); flex: 1; min-width: 160px; cursor: help; }
+.mesa-ant-txt b { color: var(--muted); }
+.mesa-igual { flex-shrink: 0; }
+.mesa-igual:hover { border-color: var(--acento); color: var(--acento); }
+/* Una mesa confirmada sin cambio se marca distinto de una movida: las
+   dos son lecturas, pero no dicen lo mismo. */
+.mesa-fila.es-igual .mesa-val { color: var(--muted); }
+.mesa-fila.es-igual .mesa-ant-txt { color: var(--acento); }
 /* Y el deslizador tampoco: en reposo el navegador lo pinta en oro hasta
    la mitad, que se lee como un valor puesto y contradice el «—». Apagado
    hasta que alguien lo toca. */

@@ -96,8 +96,10 @@ create table if not exists contacts (
 -- pero sin codigo no deberia registrarse como vivo.
 create table if not exists opportunities (
   id         uuid primary key default gen_random_uuid(),
+  -- El tipo admite '&': el mandato de venta real es ZRC-M&A-2026-BF-01
+  -- y no valida contra [A-Z]. El GEO no lo necesita: es plaza o pais.
   codigo     text unique
-             check (codigo is null or codigo ~ '^ZRC-[A-Z]{2,4}-[0-9]{4}-[A-Z]{2,4}-[0-9]{2}$'),
+             check (codigo is null or codigo ~ '^ZRC-[A-Z&]{2,4}-[0-9]{4}-[A-Z]{2,4}-[0-9]{2}$'),
   nombre     text not null,
   plaza      text,
   vertical   text not null,

@@ -794,6 +794,48 @@ table.pipe td select.ck-est { background: var(--panel-2); border: 1px solid var(
 .tbtn-alta[aria-expanded="true"] { background: var(--acento) !important; color: #fff !important;
   border-color: var(--acento-hi) !important; }
 @media (max-width: 720px) { .tbtn-alta { margin-left: 0; width: 100%; } }
+
+/* ── ASIGNAR CÓDIGO ──────────────────────────────────────────────────
+   El código se pide por segmentos. Un campo de texto libre deja
+   escribir cualquier cosa y luego la rechaza; cuatro casillas con el
+   patrón dibujado alrededor no dejan escribir nada que no valga. */
+.cod-llamada { display: flex; flex-wrap: wrap; align-items: center; gap: 12px;
+  margin-top: 18px; padding: 13px 15px; background: var(--panel-2);
+  border: 1px solid var(--line); border-left: 2px solid var(--amber);
+  border-radius: 3px; font-size: 12.5px; color: var(--muted); }
+.cod-llamada > span { flex: 1; min-width: 200px; }
+
+.cod-frm { margin-top: 18px; padding: 16px; background: var(--panel-2);
+  border: 1px solid var(--acento-line); border-radius: 3px; }
+.cod-seg { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.cod-fijo, .cod-sep { font-family: var(--mono); font-size: 13px; font-weight: 700;
+  letter-spacing: 1.2px; color: var(--faint); }
+.cod-sep { padding-inline: 2px; }
+.cod-in { font-family: var(--mono); font-size: 13px; font-weight: 700;
+  letter-spacing: 1.2px; text-align: center; text-transform: uppercase;
+  color: var(--cream); background: var(--panel);
+  border: 1px solid var(--linea-fuerte); border-radius: 3px; padding: 9px 4px; }
+.cod-in:focus { outline: none; border-color: var(--acento);
+  box-shadow: 0 0 0 3px var(--acento-soft); }
+.cod-in::placeholder { color: var(--faint); font-weight: 400; letter-spacing: .6px; }
+
+.cod-prev { margin-top: 13px; font-family: var(--mono); font-size: 11px;
+  font-weight: 700; letter-spacing: 1.5px; }
+.cod-prev.es-ok  { color: var(--green); }
+.cod-prev.es-ok::before  { content: '\2713\00a0 '; }
+.cod-prev.es-mal { color: var(--faint); }
+.cod-prev.es-mal::before { content: '\00b7\00a0 '; }
+
+.cod-nota { margin-top: 10px; font-size: 12px; line-height: 1.65; color: var(--muted); }
+.cod-nota b { color: var(--text); }
+.cod-btns { display: flex; align-items: center; gap: 16px; margin-top: 15px; }
+.cod-btns .btn-oro { width: auto; padding-inline: 24px; margin-top: 0; }
+
+/* En la tabla, para no entrar y salir de la ficha 17 veces. */
+.td-cod-btn { font: inherit; letter-spacing: .4px; color: var(--acento);
+  background: none; border: none; padding: 0; cursor: pointer;
+  border-bottom: 1px dashed var(--acento-line); }
+.td-cod-btn:hover { color: var(--acento-hi); border-bottom-style: solid; }
 .alta-aviso { grid-column: 1 / -1; margin-top: -4px; }
 
 /* ── MERCADO ──────────────────────────────────────────────────────────
@@ -1254,6 +1296,6 @@ table.pipe td select.ck-est { background: var(--panel-2); border: 1px solid var(
 
 <div class="loading" id="boot">CONECTANDO&hellip;</div>
 
-<script type="module" src="./app.js?v=2026-10-11a"></script>
+<script type="module" src="./app.js?v=2026-10-11b"></script>
 </body>
 </html>

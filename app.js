@@ -27,7 +27,7 @@ const EXT_OK = ['pdf','doc','docx','xls','xlsx','ppt','pptx','csv','txt','rtf',
 // copia vieja de su cache: eso, y no un despliegue parado, es lo que hace
 // que una actualizacion publicada no se vea. Hay que subir las dos a la
 // vez: esta constante y el ?v= de index.html.
-const VERSION = '2026-10-11a';
+const VERSION = '2026-10-11b';
 const VERSION_PEDIDA = new URL(import.meta.url).searchParams.get('v');
 
 function sellaVersion() {
@@ -54,6 +54,7 @@ const state = {
   rows: [], flags: [], pend: [], dims: [], bands: [],
   docs: [], econ: [], strat: [], outreach: [], mand: [], check: [], drError: null,
   ckPrio: '', ckEst: '',
+  codAbierto: null, codProp: null,
   rubrics: [], gates: [], risk: [], doctError: null,
   outcomes: [], decisions: [], outError: null,
   miembros: [], accesos: [],
@@ -382,7 +383,159 @@ const ESTADOS = {
 };
 // §12.3. Se valida aqui ADEMAS de en la base: la restriccion de Postgres
 // rechaza con un mensaje de constraint que no le dice nada a nadie.
-const PATRON_CODIGO = /^ZRC-[A-Z]{2,4}-[0-9]{4}-[A-Z]{2,4}-[0-9]{2}$/;
+//
+// EL TIPO ADMITE '&'. El mandato de venta real de la firma es
+// ZRC-M&A-2026-BF-01, que no valida contra [A-Z]. Este patron tiene que
+// ser EL MISMO que el check de opportunities (24_codigo.sql): si el
+// navegador es mas estricto que la base, rechaza codigos que la firma
+// usa de verdad, y eso es exactamente lo que hacia.
+const PATRON_CODIGO = /^ZRC-[A-Z&]{2,4}-[0-9]{4}-[A-Z]{2,4}-[0-9]{2}$/;
+
+// ── ASIGNAR CODIGO A UN EXPEDIENTE QUE NO LO TIENE ──────────────────
+// La cola lleva 17 expedientes con el aviso «asignar codigo con el
+// patron del manual» y no habia ningun sitio donde asignarlo. Un aviso
+// sin control al lado es un reproche.
+//
+// Se pide por segmentos y no como texto libre: asi el patron no se
+// puede incumplir, y no hay que explicarlo.
+
+const SINTILDE = (x) => String(x ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+// Un filtro por segmento. El '&' solo vale en el tipo; el GEO es una
+// plaza o un pais y no lleva ninguno.
+const LIMPIA = {
+  cTipo: (x) => SINTILDE(x).toUpperCase().replace(/[^A-Z&]/g, ''),
+  cGeo:  (x) => SINTILDE(x).toUpperCase().replace(/[^A-Z]/g, ''),
+  cAnio: (x) => x.replace(/[^0-9]/g, ''),
+  cNN:   (x) => x.replace(/[^0-9]/g, '')
+};
+
+// EL TIPO NO SE DEDUCE, Y NO SE INVENTA. 'HTL' no esta en la cadena
+// «Inmobiliario hotelero» y 'M&A' no esta en ninguna vertical: los fija
+// el manual. Lo unico honrado es copiarlo de otro expediente de la
+// misma vertical que ya lo tenga, y si no hay ninguno, dejarlo en
+// blanco y decir por que.
+function tipoPorPrecedente(vertical) {
+  const cuenta = new Map();
+  for (const r of state.rows) {
+    if (!r.codigo || r.vertical !== vertical) continue;
+    const t = r.codigo.split('-')[1];
+    if (t) cuenta.set(t, (cuenta.get(t) ?? 0) + 1);
+  }
+  return [...cuenta.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? '';
+}
+
+// MAD, MIA y JRZ: los tres codigos de plaza que ya existen salen de las
+// tres primeras letras de la plaza. Sin plaza, el pais ya es un
+// segmento valido de dos letras.
+const geoPorPlaza = (r) => LIMPIA.cGeo(r.plaza).slice(0, 3) || LIMPIA.cGeo(r.geo).slice(0, 4);
+
+// El primer secuencial libre de ese prefijo, no el siguiente al total:
+// con huecos, contar daria uno ya usado.
+function siguienteNN(tipo, anio, geo) {
+  const pre = `ZRC-${tipo}-${anio}-${geo}-`;
+  const usados = new Set(state.rows.map(r => r.codigo)
+    .filter(c => c && c.startsWith(pre))
+    .map(c => Number(c.slice(pre.length)))
+    .filter(x => Number.isInteger(x)));
+  let i = 1; while (usados.has(i) && i < 99) i++;
+  return String(i).padStart(2, '0');
+}
+
+function proponeCodigo(r) {
+  const tipo = tipoPorPrecedente(r.vertical);
+  const anio = String(new Date().getFullYear());
+  const geo  = geoPorPlaza(r);
+  return { tipo, anio, geo, nn: tipo && geo ? siguienteNN(tipo, anio, geo) : '01' };
+}
+
+function panelCodigo(r) {
+  if (r.codigo || !canWrite()) return '';
+  if (state.codAbierto !== r.opportunity_id)
+    return `<div class="cod-llamada">
+      <span>Este expediente no tiene código, así que no puede registrarse formalmente (§12.3).</span>
+      <button type="button" class="tbtn-alta" id="codAbrir">ASIGNAR CÓDIGO</button></div>`;
+
+  const p = state.codProp ?? proponeCodigo(r);
+  const seg = (id, v, n, ph, lbl) => `<input class="cod-in" id="${id}" value="${esc(v)}"
+    maxlength="${n}" style="width:${n + 1.5}ch" placeholder="${ph}" aria-label="${lbl}"
+    autocomplete="off" spellcheck="false" />`;
+  return `<div class="cod-frm" id="codFrm">
+    <div class="cod-seg">
+      <span class="cod-fijo">ZRC</span><span class="cod-sep">-</span>
+      ${seg('cTipo', p.tipo, 4, 'TIPO', 'Tipo de operación')}<span class="cod-sep">-</span>
+      ${seg('cAnio', p.anio, 4, 'AÑO',  'Año')}<span class="cod-sep">-</span>
+      ${seg('cGeo',  p.geo,  4, 'GEO',  'Plaza o país')}<span class="cod-sep">-</span>
+      ${seg('cNN',   p.nn,   2, 'NN',   'Secuencial')}
+    </div>
+    <div class="cod-prev" id="codPrev" aria-live="polite"></div>
+    <div class="cod-nota">${p.tipo
+      ? `El tipo <b>${esc(p.tipo)}</b> está copiado de otro expediente de la misma vertical.`
+      : `<b>El tipo no se deduce de la vertical</b> y no lo voy a inventar: no hay ningún
+         expediente de esta vertical con código del que copiarlo. Lo fija el manual (§12.3).`}
+      El GEO sale de la plaza y el secuencial es el primero libre. Cámbialos si no cuadran.</div>
+    <div class="cod-btns">
+      <button class="btn-oro" id="codGuardar">ASIGNAR</button>
+      <button type="button" class="linkbtn" id="codCerrar">cancelar</button>
+    </div>
+    <div class="frm-msg" id="codMsg"></div>
+  </div>`;
+}
+
+function cablearCodigo(r) {
+  $('codAbrir')?.addEventListener('click', () => {
+    state.codAbierto = r.opportunity_id;
+    state.codProp = proponeCodigo(r);
+    renderDetail();
+  });
+  if (!$('codFrm')) return;
+
+  $('codCerrar')?.addEventListener('click', () => {
+    state.codAbierto = null; state.codProp = null; renderDetail();
+  });
+
+  const ids = ['cTipo', 'cAnio', 'cGeo', 'cNN'];
+  const arma = () => 'ZRC-' + ids.map(i => $(i).value.trim()).join('-');
+  const pinta = () => {
+    const c = arma();
+    const ok  = PATRON_CODIGO.test(c);
+    const dup = state.rows.some(x => x.codigo === c);
+    const pv = $('codPrev');
+    pv.textContent = c;
+    pv.className = 'cod-prev' + (ok && !dup ? ' es-ok' : ' es-mal');
+    $('codGuardar').disabled = !ok || dup;
+    const m = $('codMsg');
+    m.className = 'frm-msg' + (dup ? ' err' : '');
+    m.textContent = dup ? 'ESE CÓDIGO YA ESTÁ EN USO POR OTRO EXPEDIENTE.' : '';
+  };
+  for (const i of ids) {
+    const el = $(i);
+    el.addEventListener('input', () => {
+      const pos = el.selectionStart;
+      el.value = LIMPIA[i](el.value);
+      try { el.setSelectionRange(pos, pos); } catch { /* el campo ya no esta */ }
+      pinta();
+    });
+    el.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !$('codGuardar').disabled) { e.preventDefault(); $('codGuardar').click(); }
+    });
+  }
+  pinta();
+  // El foco va donde hay que escribir: al tipo si no se pudo proponer,
+  // y al secuencial si todo lo demas ya viene puesto.
+  $(state.codProp?.tipo ? 'cNN' : 'cTipo')?.focus();
+  $(state.codProp?.tipo ? 'cNN' : 'cTipo')?.select();
+
+  $('codGuardar')?.addEventListener('click', async (ev) => {
+    const codigo = arma();
+    if (!PATRON_CODIGO.test(codigo)) return;
+    await guardar($('codMsg'), ev.target, () =>
+      sb.from('opportunities').update({ codigo }).eq('id', r.opportunity_id),
+      'CÓDIGO ASIGNADO.');
+    if (state.rows.find(x => x.opportunity_id === r.opportunity_id)?.codigo) {
+      state.codAbierto = null; state.codProp = null; renderDetail();
+    }
+  });
+}
 
 function formAlta() {
   if (!state.altaAbierta || !canWrite()) return '';
@@ -1175,13 +1328,25 @@ function renderPipe() {
          <span class="score-bar"><span class="score-fill" style="width:${r.dealscore}%;background:${bandColor(r.banda)}"></span></span>`;
     return `<tr data-id="${esc(r.opportunity_id)}" tabindex="0" aria-selected="${r.opportunity_id === state.selected}">
       <td><div class="td-name">${esc(r.nombre)}</div>
-      <div class="td-code">${esc(r.codigo ?? '— sin código —')}${r.plaza ? ' · ' + esc(r.plaza) : ''}</div></td>
+      <div class="td-code">${r.codigo ? esc(r.codigo)
+        : (canWrite()
+           ? `<button type="button" class="td-cod-btn" data-cod="${esc(r.opportunity_id)}">+ asignar código</button>`
+           : '— sin código —')}${r.plaza ? ' · ' + esc(r.plaza) : ''}</div></td>
       <td><span class="td-vert">${esc(r.vertical)}</span></td>
       <td><div class="score-cell">${score}</div></td>
       <td><span class="pill pill-${esc(r.banda ?? 'NONE')}">${esc(r.banda ?? 'NONE')}</span>
         ${r.reservado ? '<span class="pill pill-RESERVADO" style="margin-left:6px">⛔ RESERVADO</span>' : ''}</td>
       <td>${scope}</td></tr>`;
   }).join('');
+  // Asignar los 17 que faltan entrando y saliendo de la ficha son 34
+  // navegaciones. Desde la tabla es un clic y dos pulsaciones.
+  for (const b of $('pipeBody').querySelectorAll('[data-cod]'))
+    b.addEventListener('click', (e) => {
+      e.stopPropagation();
+      state.codAbierto = b.dataset.cod;
+      state.codProp = proponeCodigo(state.rows.find(r => r.opportunity_id === b.dataset.cod));
+      select(b.dataset.cod);
+    });
   $('pipeCount').textContent = `${rs.length} DE ${state.rows.length} EXPEDIENTES`;
   $('pipeRef').textContent = `${state.rows.length} EXPEDIENTES · ${MODEL_ID.toUpperCase()}`;
 }
@@ -1465,12 +1630,14 @@ function renderDetail() {
         <div class="detail-score-l">${esc(band?.etiqueta ?? 'SIN PUNTUAR')}</div>
       </div>
     </div>
+    ${panelCodigo(r)}
     <div class="detail-cols">
       <div>${dimHtml}</div>
       <div>${goNoGo(r, vals, sc)}${scopeHtml}${action}</div>
     </div>
     <div class="detail-gov">${panelReserva(r)}${panelDecision(r)}</div>`;
 
+  cablearCodigo(r);
   if (!canWrite()) { cablearReserva(r); cablearDecision(r); }
   if (canWrite()) {
     for (const el of $('detail').querySelectorAll('input[type=range]')) {

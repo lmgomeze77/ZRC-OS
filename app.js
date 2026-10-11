@@ -36,7 +36,7 @@ const state = {
   outcomes: [], decisions: [], outError: null,
   miembros: [], accesos: [],
   actividad: [], actError: null,
-  serie: [], riesgo: null, mesas: [], lecturas: [], pendFirma: [], mercError: null,
+  serie: [], lecturasPub: [], riesgo: null, mesas: [], lecturas: [], pendFirma: [], mercError: null,
   secScore: [], secPipe: [], secDims: [], secRub: [], secSel: '', secError: null,
   altaAbierta: false, altaDup: null, altaCreado: null,
   drTab: 'documentos', pane: 'detail', docQ: '', docCat: '', ckPlazo: '', hoyTab: '', nombre: null,
@@ -178,14 +178,17 @@ async function loadAll() {
     ]);
     const fallo = [ser, est, mes, lec, pf].find(r => r.error);
     if (fallo) throw fallo.error;
-    state.serie = ser.data ?? [];
+    const todo = ser.data ?? [];
+    state.serie = todo.filter(r => r.metodo !== 'lectura');
+    state.lecturasPub = todo.filter(r => r.metodo === 'lectura');
     state.riesgo = est.data ?? null;
     state.mesas = mes.data ?? [];
     state.lecturas = lec.data ?? [];
     state.pendFirma = pf.data ?? [];
     state.mercError = null;
   } catch (err) {
-    state.serie = []; state.riesgo = null; state.mesas = []; state.lecturas = [];
+    state.serie = []; state.lecturasPub = []; state.riesgo = null;
+    state.mesas = []; state.lecturas = [];
     state.pendFirma = [];
     state.mercError = String(err?.message ?? err);
   }
@@ -286,11 +289,17 @@ function renderStats() {
 
 // El punto hueco marca un valor reconstruido por interpolacion: no es una
 // lectura, y dibujarlo igual que una lectura seria afirmar algo que no consta.
-function sparkline(serie) {
+// `cotejo` es una segunda serie dibujada en fino y a trazos: no es la
+// misma medida, asi que no comparte trazo ni puntos, solo los ejes. Es
+// lo que deja ver cuanto se separa la lectura de la IA de la formula.
+function sparkline(serie, cotejo) {
   const W = 200, H = 42, PT = 6, PB = 6, PL = 2, PR = 6;
   if (serie.length < 2) return '';
   const vals = serie.map(r => r.valor);
-  const lo = Math.min(...vals) - 3, hi = Math.max(...vals) + 3;
+  const porFecha = new Map(serie.map((r, i) => [r.fecha, i]));
+  const cot = (cotejo ?? []).filter(r => porFecha.has(r.fecha));
+  const todos = vals.concat(cot.map(r => r.valor));
+  const lo = Math.min(...todos) - 3, hi = Math.max(...todos) + 3;
   const x = i => PL + i * (W - PL - PR) / (serie.length - 1);
   const y = v => PT + (hi - v) * (H - PT - PB) / (hi - lo);
   const d = serie.map((r, i) => (i ? 'L' : 'M') + x(i).toFixed(1) + ' ' + y(r.valor).toFixed(1)).join(' ');
@@ -304,13 +313,17 @@ function sparkline(serie) {
       r.estado === 'reconstruido' ? 'var(--faint)' : 'var(--amber)'}" stroke-width="1.2"></circle>`;
   }).join('');
   return `<svg viewBox="0 0 ${W} ${H}" width="100%" height="${H}" role="img"
-    aria-label="Índice de riesgo ZRC, ${serie.length} días, de ${vals[0]} a ${vals[vals.length-1]}"
+    aria-label="Índice de mesas, ${serie.length} días, de ${vals[0]} a ${vals[vals.length-1]}"
     preserveAspectRatio="none" style="display:block;max-width:100%">
     <defs><linearGradient id="sparkG" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0%" stop-color="var(--acento)" stop-opacity=".22"></stop>
       <stop offset="100%" stop-color="var(--acento)" stop-opacity="0"></stop>
     </linearGradient></defs>
     <path d="${area}" fill="url(#sparkG)"></path>
+    ${cot.length > 1 ? `<path d="${cot.map((r, i) => (i ? 'L' : 'M')
+        + x(porFecha.get(r.fecha)).toFixed(1) + ' ' + y(r.valor).toFixed(1)).join(' ')}"
+      fill="none" stroke="var(--faint)" stroke-width="1.1" stroke-dasharray="3 2.5"
+      stroke-linejoin="round" opacity=".85"></path>` : ''}
     <path d="${d}" fill="none" stroke="var(--acento)" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"></path>
     ${dots}</svg>`;
 }
@@ -477,8 +490,8 @@ function anteriorDe(clave, hoy) {
 
 function bloqueIndice() {
   if (state.mercError) {
-    return `<div class="card"><div class="merc-tit">Índice de riesgo ZRC</div>
-      ${avisoModulo(state.mercError, 'ÍNDICE NO DISPONIBLE', '17_indice.sql',
+    return `<div class="card"><div class="merc-tit">Índice de mesas · ZRC</div>
+      ${avisoModulo(state.mercError, 'ÍNDICE DE MESAS NO DISPONIBLE', '17_indice.sql',
         'Hasta que se aplique, el índice sigue siendo un número suelto que nadie puede reproducir ni rellenar a medias.')}</div>`;
   }
   const e = state.riesgo;
@@ -494,10 +507,18 @@ function bloqueIndice() {
         · ${esc(e.estado)}${e.cobertura != null ? ` · ${e.cobertura}% de cobertura` : ''}</span>
     </div>
     <div class="stat-sub">${esc(e.fecha)} · ${e.dias_serie} días de serie</div>
-    ${tramo.length > 1 ? `<div class="spark-wrap">${sparkline(tramo)}</div>` : ''}
+    ${e.lectura != null ? `<div class="merc-cotejo">
+      El briefing publicó <b>${e.lectura}</b> ese día${e.brecha != null
+        ? ` · <span class="merc-brecha">${e.brecha > 0 ? '+' : ''}${e.brecha}</span> de brecha` : ''}.
+      Lo propone la IA leyendo los titulares, así que no se reproduce desde las mesas.</div>` : ''}
+    ${tramo.length > 1 ? `<div class="spark-wrap">${sparkline(tramo, state.lecturasPub)}</div>
+      <div class="spark-legend">
+        <span><i style="background:var(--acento)"></i>Índice de mesas</span>
+        <span><i class="i-trazo"></i>Lectura del briefing</span>
+      </div>` : ''}
     ${corte ? `<div class="merc-corte">SERIE CORTADA · ${corte.dias} días sin lectura tras el ${esc(corte.desde)}.
        No se dibuja el hueco porque no se midió.</div>` : ''}
-    ${e.caducado ? `<p class="merc-caduco"><b>El índice está caducado.</b>
+    ${e.caducado ? `<p class="merc-caduco"><b>El índice de mesas está caducado.</b>
        Lleva ${e.dias_sin_actualizar} días sin actualizar, así que describe el riesgo de entonces,
        no el de hoy. El barrido de mesas es lo que lo reactiva.</p>` : ''}`;
 
@@ -537,8 +558,8 @@ function bloqueIndice() {
     </div>`;
 
   return `<div class="card">
-    <div class="merc-tit">Índice de riesgo ZRC</div>
-    <div class="merc-dir">0 a 100 · más es MÁS riesgo</div>
+    <div class="merc-tit">Índice de mesas · ZRC</div>
+    <div class="merc-dir">0 a 100 · más es MÁS riesgo · derivado de las nueve mesas</div>
     ${cabecera}${form}${panelMesas()}</div>`;
 }
 
@@ -674,7 +695,7 @@ function formSector() {
 function renderMercado() {
   const e = state.riesgo;
   $('mercRef').textContent = e
-    ? (e.caducado ? `ÍNDICE CADUCADO · ${e.dias_sin_actualizar} DÍAS` : `ÍNDICE AL ${e.fecha}`)
+    ? (e.caducado ? `ÍNDICE DE MESAS CADUCADO · ${e.dias_sin_actualizar} DÍAS` : `MESAS AL ${e.fecha}`)
     : 'SIN LECTURAS';
   $('mercIndice').innerHTML = bloqueIndice();
   $('mercSector').innerHTML = bloqueSectorial();

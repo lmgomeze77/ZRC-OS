@@ -172,7 +172,7 @@ async function loadAll() {
     const [ser, est, mes, lec, pf] = await Promise.all([
       sb.from('v_risk_serie').select('*').order('fecha'),
       sb.from('v_risk_estado').select('*').maybeSingle(),
-      sb.from('risk_mesas').select('*').eq('activa', true).order('orden'),
+      sb.from('risk_mesas').select('*').order('orden'),
       sb.from('risk_lecturas').select('*').gte('fecha', desde),
       sb.from('v_pendientes_firma').select('*')
     ]);
@@ -501,14 +501,15 @@ function bloqueIndice() {
        Lleva ${e.dias_sin_actualizar} días sin actualizar, así que describe el riesgo de entonces,
        no el de hoy. El barrido de mesas es lo que lo reactiva.</p>` : ''}`;
 
-  const form = !canWrite() || !state.mesas.length ? '' : `
+  const activas = state.mesas.filter(m => m.activa);
+  const form = !canWrite() || !activas.length ? '' : `
     <div class="frm" id="frmMesas">
       <div class="merc-tit" style="margin-bottom:10px">Barrido de hoy · ${esc(hoy)}</div>
       <p class="pista" style="font-size:11.5px;color:var(--muted);line-height:1.5;margin-bottom:12px">
         No hace falta completar las nueve: con las que leas sale número, marcado como parcial.
         Mirar una mesa y ver que no se ha movido <b>sí es una lectura</b> — para eso está
         «sin cambio». Lo que no vale es no mirarla.</p>
-      ${state.mesas.map(m => {
+      ${activas.map(m => {
         const l = leidoHoy.get(m.clave);
         const ant = anteriorDe(m.clave, hoy);
         // El deslizador arranca en la ultima lectura si la hay: casi
@@ -538,7 +539,59 @@ function bloqueIndice() {
   return `<div class="card">
     <div class="merc-tit">Índice de riesgo ZRC</div>
     <div class="merc-dir">0 a 100 · más es MÁS riesgo</div>
-    ${cabecera}${form}</div>`;
+    ${cabecera}${form}${panelMesas()}</div>`;
+}
+
+// Le dije al usuario "las mesas son filas, cambialas" -- y solo se
+// podian cambiar por SQL. El mismo callejon sin salida que tenia el
+// formulario de economics. Aqui se ven y, si puedes escribir, se
+// editan.
+function panelMesas() {
+  if (!state.mesas.length) return '';
+  const editable = canWrite();
+  const act = state.mesas.filter(m => m.activa).length;
+  const fila = (m) => editable ? `
+    <tr data-mesaid="${esc(m.clave)}">
+      <td class="mesa-clave">${esc(m.clave)}</td>
+      <td><input type="text" class="mc-nom" value="${esc(m.nombre)}" maxlength="80" /></td>
+      <td><input type="text" class="mc-desc" value="${esc(m.descripcion ?? '')}" maxlength="200"
+                 placeholder="Qué mira esta mesa" /></td>
+      <td class="num"><input type="number" class="mc-peso" value="${m.peso}" step="0.1" min="0.1" max="9" /></td>
+      <td class="num"><input type="checkbox" class="mc-act" ${m.activa ? 'checked' : ''}
+            aria-label="${esc(m.nombre)} activa" /></td>
+    </tr>` : `
+    <tr><td class="mesa-clave">${esc(m.clave)}</td><td>${esc(m.nombre)}</td>
+      <td class="mesa-desc">${esc(m.descripcion ?? '')}</td>
+      <td class="num">${m.peso}</td><td class="num">${m.activa ? 'sí' : 'no'}</td></tr>`;
+
+  // La clave siguiente, para dar de alta sin pensarla. No se reutiliza
+  // ninguna retirada: una clave vieja arrastraria sus lecturas.
+  const nums = state.mesas.map(m => parseInt(String(m.clave).replace(/\D/g, ''), 10))
+    .filter(n => !isNaN(n));
+  const sig = 'M' + ((nums.length ? Math.max(...nums) : 0) + 1);
+
+  return `<details class="mesas-cfg">
+    <summary>Las mesas del barrido · ${act} activa${act === 1 ? '' : 's'} de ${state.mesas.length}</summary>
+    <p class="pista" style="font-size:11.5px;color:var(--muted);line-height:1.55;margin:10px 0 12px">
+      Son datos, no código: cambiar el barrido no exige desplegar nada. El <b>peso</b> es relativo
+      — todas a 1 significa que ninguna manda sobre otra, que es lo honesto mientras no se sepa
+      cuál anticipa mejor. Desactivar una mesa la saca del índice de hoy pero
+      <b>no reescribe el pasado</b>: sus lecturas siguen contando en sus días.
+    </p>
+    <div class="table-scroll"><table class="sec-tabla mesas-tabla">
+      <colgroup><col class="c-clave" /><col /><col /><col class="c-peso" /><col class="c-act" /></colgroup>
+      <thead><tr><th>Clave</th><th>Nombre</th><th>Qué mira</th>
+        <th class="num">Peso</th><th class="num">Activa</th></tr></thead>
+      <tbody>${state.mesas.map(fila).join('')}</tbody>
+    </table></div>
+    ${editable ? `
+      <div class="mesas-alta">
+        <input type="text" id="mcNueva" maxlength="80" placeholder="Añadir una mesa: cómo se llama" />
+        <button class="btn-mini" id="mcAdd">+ AÑADIR ${esc(sig)}</button>
+      </div>
+      <button class="btn-oro" id="mcSave">GUARDAR LAS MESAS</button>
+      <div class="frm-msg" id="mcMsg"></div>` : ''}
+  </details>`;
 }
 
 function bloqueSectorial() {
@@ -676,7 +729,50 @@ function cablearMercado() {
     }
     guardar(m, ev.target,
       () => sb.from('risk_lecturas').upsert(filas, { onConflict: 'fecha,mesa' }),
-      `BARRIDO GUARDADO · ${filas.length} DE ${state.mesas.length} MESAS.`);
+      `BARRIDO GUARDADO · ${filas.length} DE ${state.mesas.filter(m => m.activa).length} MESAS.`);
+  });
+
+  // Las mesas: se envia solo lo que haya cambiado de verdad, comparando
+  // contra lo cargado. Guardar nueve filas iguales cada vez seria
+  // ruido, y ademas pisaria un cambio que otro hubiera hecho entretanto.
+  $('mcSave')?.addEventListener('click', (ev) => {
+    const m = $('mcMsg');
+    const filas = [];
+    for (const tr of document.querySelectorAll('[data-mesaid]')) {
+      const o = state.mesas.find(x => x.clave === tr.dataset.mesaid);
+      const n = {
+        clave: tr.dataset.mesaid,
+        nombre: tr.querySelector('.mc-nom').value.trim(),
+        descripcion: tr.querySelector('.mc-desc').value.trim() || null,
+        peso: Number(tr.querySelector('.mc-peso').value),
+        activa: tr.querySelector('.mc-act').checked,
+        orden: o?.orden ?? 99
+      };
+      if (!n.nombre) { m.className = 'frm-msg err';
+        m.textContent = 'UNA MESA SIN NOMBRE NO SE PUEDE BARRER: ' + n.clave; return; }
+      if (!(n.peso > 0)) { m.className = 'frm-msg err';
+        m.textContent = 'EL PESO TIENE QUE SER MAYOR QUE CERO: ' + n.clave; return; }
+      if (!o || o.nombre !== n.nombre || (o.descripcion ?? null) !== n.descripcion
+          || Number(o.peso) !== n.peso || o.activa !== n.activa) filas.push(n);
+    }
+    if (!filas.length) { m.className = 'frm-msg'; m.textContent = 'NADA QUE GUARDAR: NO HAS CAMBIADO NINGUNA.'; return; }
+    if (!filas.some(f => f.activa) && !state.mesas.some(x => x.activa && !filas.find(f => f.clave === x.clave))) {
+      m.className = 'frm-msg err';
+      m.textContent = 'NO PUEDES DEJAR CERO MESAS ACTIVAS: EL ÍNDICE SE QUEDARÍA SIN DE QUÉ SALIR.'; return;
+    }
+    guardar(m, ev.target, () => sb.from('risk_mesas').upsert(filas, { onConflict: 'clave' }),
+      `GUARDADAS · ${filas.length} MESA${filas.length === 1 ? '' : 'S'} CAMBIADA${filas.length === 1 ? '' : 'S'}.`);
+  });
+  $('mcAdd')?.addEventListener('click', (ev) => {
+    const m = $('mcMsg');
+    const nombre = $('mcNueva')?.value.trim();
+    if (!nombre) { m.className = 'frm-msg err'; m.textContent = 'PONLE NOMBRE A LA MESA NUEVA.'; return; }
+    const nums = state.mesas.map(x => parseInt(String(x.clave).replace(/\D/g, ''), 10)).filter(n => !isNaN(n));
+    const clave = 'M' + ((nums.length ? Math.max(...nums) : 0) + 1);
+    const orden = Math.max(0, ...state.mesas.map(x => x.orden ?? 0)) + 1;
+    guardar(m, ev.target,
+      () => sb.from('risk_mesas').insert({ clave, nombre, orden, peso: 1, activa: true }),
+      `MESA ${clave} AÑADIDA.`);
   });
 
   // El sector: al mover el tramo cambia el ancla, que es el punto de

@@ -843,6 +843,47 @@ table.pipe td select.ck-est { background: var(--panel-2); border: 1px solid var(
    dos son lecturas, pero no dicen lo mismo. */
 .mesa-fila.es-igual .mesa-val { color: var(--muted); }
 .mesa-fila.es-igual .mesa-ant-txt { color: var(--acento); }
+
+/* La configuracion de las mesas. Plegada por defecto: se mira cuando se
+   cambia el barrido, no todos los dias. */
+.mesas-cfg { margin-top: 18px; border-top: 1px solid var(--line); padding-top: 14px; }
+.mesas-cfg summary { font-family: var(--mono); font-size: 9px; font-weight: 700;
+  letter-spacing: 1.2px; text-transform: uppercase; color: var(--acento);
+  cursor: pointer; list-style: none; padding: 4px 0; }
+.mesas-cfg summary::-webkit-details-marker { display: none; }
+.mesas-cfg summary::before { content: '▸ '; }
+.mesas-cfg[open] summary::before { content: '▾ '; }
+.mesas-cfg summary:hover { color: var(--acento-hi); }
+.mesas-tabla { table-layout: fixed; }
+/* Anchos fijos: sin ellos el nombre se quedaba en un tercio de lo que
+   necesita y las cabeceras de peso y activa se pegaban la una a la
+   otra. */
+.mesas-tabla col.c-clave { width: 48px; }
+.mesas-tabla col.c-peso  { width: 72px; }
+.mesas-tabla col.c-act   { width: 62px; }
+.mesas-tabla td { vertical-align: middle; padding: 7px 10px 7px 0; }
+.mesas-tabla th.num, .mesas-tabla td.num { padding-right: 8px; }
+.mesas-tabla input[type=text], .mesas-tabla input[type=number] {
+  width: 100%; background: var(--panel-2); border: 1px solid var(--line); border-radius: 2px;
+  color: var(--text); font-family: var(--body); font-size: 12.5px; padding: 6px 8px; }
+.mesas-tabla input:focus { outline: none; border-color: var(--acento-line); }
+.mesas-tabla input[type=number] { width: 68px; text-align: right; font-family: var(--mono); }
+.mesas-tabla input[type=checkbox] { width: 16px; height: 16px; accent-color: var(--acento); }
+.mesa-clave { font-family: var(--mono); font-size: 10px; font-weight: 700; color: var(--acento); }
+.mesa-desc { color: var(--muted); font-size: 12px; }
+.mesas-alta { display: flex; gap: 10px; align-items: center; margin-top: 14px; flex-wrap: wrap; }
+.mesas-alta input { flex: 1; min-width: 200px; background: var(--panel-2);
+  border: 1px solid var(--line); border-radius: 2px; color: var(--text);
+  font-family: var(--body); font-size: 12.5px; padding: 8px 10px; }
+.mesas-alta input:focus { outline: none; border-color: var(--acento-line); }
+@media (max-width: 620px) {
+  .mesas-tabla thead { display: none; }
+  .mesas-tabla tr { display: grid; grid-template-columns: auto 1fr; gap: 4px 10px;
+    padding: 10px 0; border-bottom: 1px solid var(--line-2); }
+  .mesas-tabla td { padding: 0; border: none; }
+  .mesas-tabla td:nth-child(2), .mesas-tabla td:nth-child(3) { grid-column: 2; }
+  .mesas-tabla td.num { grid-column: 2; text-align: left; }
+}
 /* Y el deslizador tampoco: en reposo el navegador lo pinta en oro hasta
    la mitad, que se lee como un valor puesto y contradice el «—». Apagado
    hasta que alguien lo toca. */

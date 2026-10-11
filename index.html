@@ -7,7 +7,7 @@
 <title>ZRC OS</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Caladea:wght@400;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
 <style>
 
 
@@ -70,7 +70,11 @@
   --wash: rgba(15,28,46,.035);
 
   --mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
-  --display: 'Fraunces', Georgia, serif;
+  /* Caladea es el sustituto metrico de Cambria: misma anchura y mismo
+     color de pagina, asi que en Windows la cascada a Cambria no mueve
+     nada. Solo trae 400 y 700; el 600 que pide la hoja resuelve al 700
+     real -- comprobado midiendo -- y no a un negrita sintetico. */
+  --display: 'Caladea', Cambria, Georgia, serif;
   --body: 'Inter', -apple-system, system-ui, sans-serif;
 }
 
@@ -184,7 +188,6 @@ button { background: none; border: none; cursor: pointer; }
 .sec-title {
   color: var(--cream); font-family: var(--display);
   font-size: 27px; font-weight: 600; letter-spacing: -.3px; line-height: 1.15;
-  font-variation-settings: 'opsz' 40;
 }
 .sec-ref { color: var(--faint); font-family: var(--mono); font-size: 9px; letter-spacing: 1px; margin-left: auto; }
 
@@ -1317,6 +1320,6 @@ table.pipe td select.ck-est { background: var(--panel-2); border: 1px solid var(
 
 <div class="loading" id="boot">CONECTANDO&hellip;</div>
 
-<script type="module" src="./app.js?v=2026-10-11d"></script>
+<script type="module" src="./app.js?v=2026-10-11e"></script>
 </body>
 </html>

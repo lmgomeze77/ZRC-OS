@@ -27,7 +27,7 @@ const EXT_OK = ['pdf','doc','docx','xls','xlsx','ppt','pptx','csv','txt','rtf',
 // copia vieja de su cache: eso, y no un despliegue parado, es lo que hace
 // que una actualizacion publicada no se vea. Hay que subir las dos a la
 // vez: esta constante y el ?v= de index.html.
-const VERSION = '2026-10-11d';
+const VERSION = '2026-10-11e';
 const VERSION_PEDIDA = new URL(import.meta.url).searchParams.get('v');
 
 function sellaVersion() {
@@ -362,7 +362,10 @@ function tarjetaRiesgo() {
   const delta = prev ? ult.valor - prev.valor : 0;
   const flecha = delta === 0 ? '→' : (delta > 0 ? '▲' : '▼');
   const dias = Math.round((Date.now() - new Date(ult.fecha).getTime()) / 86400000);
-  return `<div class="stat"><div class="stat-label">Índice de riesgo ZRC</div>
+  // El mismo nombre que la tarjeta grande: las dos pintan la serie de
+  // MESAS, y llamarla aqui «de riesgo» la confundia con la lectura del
+  // briefing, que es el otro numero y no es este.
+  return `<div class="stat"><div class="stat-label">Índice de mesas · ZRC</div>
     <div class="stat-value">${ult.valor}<small>${flecha} ${Math.abs(delta)}</small></div>
     <div class="spark-wrap">${sparkline(tramoContinuo(serie).tramo)}</div>
     <div class="spark-legend">

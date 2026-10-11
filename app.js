@@ -27,7 +27,7 @@ const EXT_OK = ['pdf','doc','docx','xls','xlsx','ppt','pptx','csv','txt','rtf',
 // copia vieja de su cache: eso, y no un despliegue parado, es lo que hace
 // que una actualizacion publicada no se vea. Hay que subir las dos a la
 // vez: esta constante y el ?v= de index.html.
-const VERSION = '2026-10-11c';
+const VERSION = '2026-10-11d';
 const VERSION_PEDIDA = new URL(import.meta.url).searchParams.get('v');
 
 function sellaVersion() {
@@ -984,19 +984,32 @@ function formSector() {
       <select id="secSel">${sectores.map(r =>
         `<option value="${esc(r.sector)}"${r.sector === sel ? ' selected' : ''}>${esc(r.nombre)}</option>`).join('')}</select>
     </div>
+    <div class="pista" style="margin-bottom:16px">
+      La lectura es de un dia: el score toma solo las dimensiones de la fecha mas
+      reciente. Si puntuas cuatro hoy y tres manana, manana el sector se queda con
+      la cobertura de esas tres. <b>Haz las siete de una vez.</b>
+    </div>
     ${state.secDims.map(d => {
       const anclas = state.secRub.filter(r => r.dimension === d.clave).sort((a, b) => a.tramo - b.tramo);
-      // Igual que las mesas: una dimension sin tocar no es un tramo 2.
+      // Las cinco anclas A LA VISTA, y se elige pulsando la que describe
+      // lo que hay. Antes era un deslizador que ensenaba un ancla cada
+      // vez: para comparar las cinco habia que barrerlas de memoria, que
+      // es justo lo que una rubrica anclada viene a evitar. Y el
+      // deslizador arrancaba en el 2, asi que un sector que de verdad
+      // era un 2 no se podia guardar sin moverlo y devolverlo.
       return `<div class="dim-row" data-sdim="${esc(d.clave)}">
         <div class="dim-top">
           <span class="dim-code">${esc(d.clave)}</span>
           <span class="dim-name">${esc(d.nombre)}</span>
           <span class="dim-w">${Math.round(d.peso * 100)}%</span>
-          <span class="dim-val" id="sv-${esc(d.clave)}">—</span></div>
-        <input class="dim-slider" type="range" min="0" max="4" step="1" value="2"
-               aria-label="${esc(d.clave + ' ' + d.nombre)}, tramo 0 a 4" />
-        <div class="dim-anchor" id="sa-${esc(d.clave)}">Mueve el tramo para leer su ancla. Las que no toques no se guardan.</div>
-        <input type="text" class="s-fund" placeholder="Fundamento"
+          <span class="dim-val es-sin" id="sv-${esc(d.clave)}">SIN LEER</span></div>
+        ${d.descripcion ? `<div class="dim-desc">${esc(d.descripcion)}</div>` : ''}
+        <div class="anclas" aria-label="${esc(d.clave + ' ' + d.nombre)}, tramo 0 a 4">
+          ${anclas.map(a => `<button type="button" class="ancla" aria-pressed="false"
+             data-tramo="${a.tramo}"><span class="ancla-n">${a.tramo}</span>
+             <span class="ancla-t">${esc(a.texto)}</span></button>`).join('')}
+        </div>
+        <input type="text" class="s-fund" placeholder="Fundamento: de dónde sale ese tramo"
                maxlength="400" style="width:100%;margin-top:8px;background:var(--panel-2);
                border:1px solid var(--line);border-radius:2px;color:var(--text);
                font-family:var(--body);font-size:12px;padding:7px 9px" />
@@ -1136,19 +1149,25 @@ function cablearMercado() {
       `MESA ${clave} AÑADIDA.`);
   });
 
-  // El sector: al mover el tramo cambia el ancla, que es el punto de
-  // tener anclas -- se elige leyendo, no puntuando a ojo.
+  // El sector: se elige PULSANDO el ancla que describe lo que hay. Nada
+  // viene preseleccionado, asi que lo que no se lee no se guarda, y eso
+  // se ve: la dimension pone SIN LEER hasta que se toca.
   $('secSel')?.addEventListener('change', (e) => { state.secSel = e.target.value; });
   for (const f of document.querySelectorAll('[data-sdim]')) {
     const cl = f.dataset.sdim;
-    const r = f.querySelector('input[type=range]');
-    r?.addEventListener('input', () => {
-      const t = Number(r.value);
-      f.dataset.leida = '1';
-      const a = state.secRub.find(x => x.dimension === cl && x.tramo === t);
-      const ea = $('sa-' + cl); if (ea) ea.textContent = a?.texto ?? '';
-      const ev = $('sv-' + cl); if (ev) ev.textContent = t;
-    });
+    for (const b of f.querySelectorAll('.ancla')) {
+      b.addEventListener('click', () => {
+        f.dataset.leida = '1';
+        f.dataset.tramo = b.dataset.tramo;
+        for (const o of f.querySelectorAll('.ancla')) {
+          const sel = o === b;
+          o.classList.toggle('es-sel', sel);
+          o.setAttribute('aria-pressed', String(sel));
+        }
+        const ev = $('sv-' + cl);
+        if (ev) { ev.textContent = b.dataset.tramo; ev.classList.remove('es-sin'); }
+      });
+    }
   }
   $('secSave')?.addEventListener('click', (ev) => {
     const sector = $('secSel')?.value;
@@ -1156,13 +1175,13 @@ function cablearMercado() {
     const hoy = new Date().toISOString().slice(0, 10);
     const filas = [...document.querySelectorAll('[data-sdim][data-leida="1"]')].map(f => ({
       sector, fecha: hoy, dimension: f.dataset.sdim,
-      tramo: Number(f.querySelector('input[type=range]').value),
+      tramo: Number(f.dataset.tramo),
       fundamento: f.querySelector('.s-fund').value.trim() || null
     }));
     const m = $('secMsg');
     if (!filas.length) {
       m.className = 'frm-msg err';
-      m.textContent = 'NO HAS PUNTUADO NINGUNA DIMENSIÓN. ELIGE TRAMO EN AL MENOS UNA.';
+      m.textContent = 'NO HAS PUNTUADO NINGUNA DIMENSIÓN. PULSA EL ANCLA QUE DESCRIBE LO QUE HAY.';
       return;
     }
     guardar(m, ev.target,

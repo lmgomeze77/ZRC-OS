@@ -480,6 +480,26 @@ section.section, .work-main { scroll-margin-top: 66px; }
 }
 .dim-anchor { font-size: 11.5px; color: var(--muted); margin-top: 6px; font-style: italic; line-height: 1.45; }
 
+/* ── LAS CINCO ANCLAS DE UNA DIMENSION SECTORIAL ─────────────────────
+   A la vista las cinco, y se elige pulsando. Una rubrica anclada sirve
+   para comparar descripciones; ensenarlas de una en una obliga a
+   recordarlas, que es lo contrario. */
+.dim-desc { font-size: 11.5px; color: var(--faint); margin-top: 3px; line-height: 1.5; }
+.anclas { display: grid; gap: 4px; margin-top: 9px; }
+.ancla { display: flex; gap: 10px; align-items: baseline; width: 100%;
+  text-align: left; padding: 8px 11px; cursor: pointer;
+  background: var(--panel); border: 1px solid var(--line-2); border-radius: 3px;
+  font-family: var(--body); font-size: 11.5px; line-height: 1.45; color: var(--muted); }
+.ancla:hover { border-color: var(--acento-line); color: var(--text); }
+.ancla:focus-visible { outline: none; border-color: var(--acento);
+  box-shadow: 0 0 0 3px var(--acento-soft); }
+.ancla-n { font-family: var(--mono); font-size: 10px; font-weight: 700;
+  color: var(--faint); min-width: 9px; }
+.ancla.es-sel { background: var(--acento-soft); border-color: var(--acento); color: var(--cream); }
+.ancla.es-sel .ancla-n { color: var(--acento); }
+.dim-val.es-sin { font-family: var(--mono); font-size: 8.5px; font-weight: 500;
+  letter-spacing: 1px; color: var(--faint); min-width: 54px; }
+
 .dim-slider { width: 100%; margin-top: 6px; height: 14px; background: none; -webkit-appearance: none; appearance: none; cursor: pointer; }
 .dim-slider::-webkit-slider-runnable-track { height: 2px; background: var(--track); border-radius: 2px; }
 .dim-slider::-moz-range-track { height: 2px; background: var(--track); border-radius: 2px; }
@@ -1297,6 +1317,6 @@ table.pipe td select.ck-est { background: var(--panel-2); border: 1px solid var(
 
 <div class="loading" id="boot">CONECTANDO&hellip;</div>
 
-<script type="module" src="./app.js?v=2026-10-11c"></script>
+<script type="module" src="./app.js?v=2026-10-11d"></script>
 </body>
 </html>

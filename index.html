@@ -852,6 +852,19 @@ table.pipe td select.ck-est { background: var(--panel-2); border: 1px solid var(
 .mesa-fila.es-igual .mesa-val { color: var(--muted); }
 .mesa-fila.es-igual .mesa-ant-txt { color: var(--acento); }
 
+/* La ingesta. Una linea entre el numero y el barrido: lo normal es que
+   no haya nada que hacer, asi que no puede ocupar sitio. */
+.ingesta { display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  margin-top: 14px; padding: 9px 12px; background: var(--panel-2);
+  border: 1px solid var(--line-2); border-radius: 3px; }
+.ingesta-txt { flex: 1; min-width: 190px; font-size: 11.5px; color: var(--muted); line-height: 1.5; }
+.ingesta-txt b { color: var(--cream); }
+.ingesta-txt .ing-ok { color: var(--green); }
+.ingesta-txt .ing-err { color: var(--red); }
+.ing-aviso { display: block; margin-top: 4px; color: var(--amber); }
+.ingesta .btn-mini { flex-shrink: 0; }
+.ingesta .btn-mini:hover { border-color: var(--acento); color: var(--acento); }
+
 /* La configuracion de las mesas. Plegada por defecto: se mira cuando se
    cambia el barrido, no todos los dias. */
 .mesas-cfg { margin-top: 18px; border-top: 1px solid var(--line); padding-top: 14px; }

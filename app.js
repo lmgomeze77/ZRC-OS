@@ -39,6 +39,7 @@ const state = {
   serie: [], lecturasPub: [], riesgo: null, mesas: [], lecturas: [], pendFirma: [], mercError: null,
   secScore: [], secPipe: [], secDims: [], secRub: [], secSel: '', secError: null,
   altaAbierta: false, altaDup: null, altaCreado: null,
+  ingesta: null, ingestaHecha: false,
   drTab: 'documentos', pane: 'detail', docQ: '', docCat: '', ckPlazo: '', hoyTab: '', nombre: null,
   selected: null, fVert: '', fBand: '', sortKey: 'score', sortDir: -1,
   draft: null
@@ -460,6 +461,108 @@ function renderAlta() {
   });
 }
 
+// ── INGESTA DEL BRIEFING ────────────────────────────────────────────
+// El indice no se paro por desidia: ZRC OS copiaba a mano de un fichero
+// que dejo de actualizarse, mientras el valor vivo cambiaba cada manana
+// a dos metros. Mientras haya que teclearlo, se volvera a parar.
+//
+// Se lee del repositorio publico del Morning Intelligence. No hace
+// falta clave: data.json es publico y lo unico que se trae es lo que
+// ya se publica.
+const BRIEFING = { duenio: 'lmgomeze77', repo: 'zrc-intelligence', fichero: 'data.json' };
+const CRUDO = (ref) => `https://raw.githubusercontent.com/${BRIEFING.duenio}/${BRIEFING.repo}/${ref}/${BRIEFING.fichero}`;
+// Como mucho dos semanas hacia atras. Si falta mas, es que el briefing
+// estuvo parado y eso no lo arregla una importacion.
+const DIAS_ATRAS_MAX = 14;
+
+// El peso de cada senal, tal cual esta en generate-briefing.js
+// (SIGNAL_RISK_WEIGHT). Una bajista suma mas riesgo del que resta una
+// alcista: es asimetrico a proposito, y copiarlo mal cambiaria la serie.
+const PESO_SENAL = { bullish: -1, bearish: 1.2, watch: 0.6, neutral: 0 };
+
+// La formula del briefing aplicada a UNA mesa. Sin su suavizacion de
+// +-12 puntos: eso es continuidad de la serie publicada, no lectura de
+// una mesa.
+function valorDeMesa(items) {
+  let num = 0, masa = 0;
+  for (const it of items ?? []) {
+    const imp = Number(it?.impact) || 0;
+    num += (PESO_SENAL[String(it?.signal ?? 'neutral').toLowerCase()] ?? 0) * imp;
+    masa += imp;
+  }
+  if (masa <= 0) return null;
+  return { valor: Math.max(5, Math.min(95, Math.round(50 + 35 * (num / masa)))), masa };
+}
+
+function leeBriefing(d, conocidas) {
+  const fecha = String(d?.generated ?? '').slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha)) return null;
+  const filas = [], desconocidas = [];
+  for (const [clave, cat] of Object.entries(d?.categories ?? {})) {
+    const v = valorDeMesa(cat?.items);
+    if (!v) continue;
+    // Una mesa que el briefing tiene y la base no, NO se inventa: la
+    // clave foranea la rechazaria y, sobre todo, habria que decidir si
+    // entra en el indice. Se nombra y se deja fuera.
+    if (!conocidas.has(clave)) { desconocidas.push(clave); continue; }
+    filas.push({ fecha, mesa: clave, valor: v.valor,
+      fundamento: `Importado del briefing del ${fecha.slice(8)}/${fecha.slice(5,7)} · masa de impacto ${v.masa}.` });
+  }
+  const lectura = Number(d?.riskIndex);
+  return { fecha, filas, desconocidas,
+           lectura: Number.isFinite(lectura) ? Math.round(lectura) : null };
+}
+
+// Los dias que faltan, no solo el de hoy: si nadie abrio el cuadro de
+// mando en el puente, se recuperan los del puente. Se piden por el
+// historial de commits, que es donde vive cada dia pasado.
+async function diasPendientes(desde) {
+  const url = `https://api.github.com/repos/${BRIEFING.duenio}/${BRIEFING.repo}/commits`
+    + `?path=${BRIEFING.fichero}&per_page=40`
+    + (desde ? `&since=${encodeURIComponent(desde + 'T00:00:00Z')}` : '');
+  const r = await fetch(url, { headers: { Accept: 'application/vnd.github+json' } });
+  if (!r.ok) throw new Error('GitHub respondió ' + r.status);
+  const porDia = new Map();
+  for (const c of await r.json()) {
+    const f = String(c?.commit?.committer?.date ?? '').slice(0, 10);
+    if (f && !porDia.has(f)) porDia.set(f, c.sha);   // el ultimo del dia manda
+  }
+  return [...porDia.entries()].sort((a, b) => a[0].localeCompare(b[0])).slice(-DIAS_ATRAS_MAX);
+}
+
+async function importarBriefing() {
+  const conocidas = new Set(state.mesas.filter(m => m.activa).map(m => m.clave));
+  if (!conocidas.size) throw new Error('No hay mesas activas contra las que importar.');
+  const ultimo = state.serie.length ? state.serie[state.serie.length - 1].fecha : null;
+  const dias = await diasPendientes(ultimo);
+  const yaEstan = new Set(state.serie.map(r => r.fecha));
+
+  const lecturas = [], indices = [];
+  const desconocidas = new Set();
+  let traidos = 0;
+  for (const [fecha, sha] of dias) {
+    if (yaEstan.has(fecha)) continue;
+    const r = await fetch(CRUDO(sha));
+    if (!r.ok) continue;
+    const b = leeBriefing(await r.json(), conocidas);
+    if (!b || !b.filas.length) continue;
+    traidos++;
+    lecturas.push(...b.filas);
+    b.desconocidas.forEach(k => desconocidas.add(k));
+    if (b.lectura != null) indices.push({ fecha: b.fecha, valor: b.lectura, estado: 'publicado' });
+  }
+  if (!lecturas.length) return { traidos: 0, desconocidas: [...desconocidas] };
+
+  const e1 = (await sb.from('risk_lecturas').upsert(lecturas, { onConflict: 'fecha,mesa' })).error;
+  if (e1) throw e1;
+  // ignoreDuplicates: un dia ya clasificado a mano como degradado o
+  // reconstruido no se pisa con un 'publicado' generico.
+  const e2 = (await sb.from('risk_index')
+    .upsert(indices, { onConflict: 'fecha', ignoreDuplicates: true })).error;
+  if (e2) throw e2;
+  return { traidos, dias: lecturas.length, desconocidas: [...desconocidas] };
+}
+
 // ── MERCADO ─────────────────────────────────────────────────────────
 
 // El tramo final de la serie SIN cortes. Unir con una recta un hueco de
@@ -523,6 +626,22 @@ function bloqueIndice() {
        no el de hoy. El barrido de mesas es lo que lo reactiva.</p>` : ''}`;
 
   const activas = state.mesas.filter(m => m.activa);
+  const ing = state.ingesta;
+  const bloqueIngesta = !canWrite() ? '' : `
+    <div class="ingesta">
+      <div class="ingesta-txt">${
+        ing?.estado === 'trayendo' ? 'Trayendo el briefing…'
+        : ing?.estado === 'error' ? `<b class="ing-err">No se pudo importar:</b> ${esc(ing.detalle)}`
+        : ing?.estado === 'ok' && ing.traidos ? `<b class="ing-ok">Importados ${ing.traidos} día${ing.traidos === 1 ? '' : 's'}</b> del briefing.`
+        : ing?.estado === 'ok' ? 'Al día con el briefing.'
+        : 'Las mesas se traen del ZRC Morning Intelligence y se recalculan aquí.'}${
+        ing?.desconocidas?.length ? ` <span class="ing-aviso">El briefing trae ${
+          ing.desconocidas.length} mesa${ing.desconocidas.length === 1 ? '' : 's'} que no está${
+          ing.desconocidas.length === 1 ? '' : 'n'} dada${ing.desconocidas.length === 1 ? '' : 's'} de alta (${
+          esc(ing.desconocidas.join(', '))}): queda fuera del índice hasta que alguien decida si entra.</span>` : ''}</div>
+      <button class="btn-mini" id="ingBtn"${ing?.estado === 'trayendo' ? ' disabled' : ''}>IMPORTAR AHORA</button>
+    </div>`;
+
   const form = !canWrite() || !activas.length ? '' : `
     <div class="frm" id="frmMesas">
       <div class="merc-tit" style="margin-bottom:10px">Barrido de hoy · ${esc(hoy)}</div>
@@ -560,7 +679,7 @@ function bloqueIndice() {
   return `<div class="card">
     <div class="merc-tit">Índice de mesas · ZRC</div>
     <div class="merc-dir">0 a 100 · más es MÁS riesgo · derivado de las nueve mesas</div>
-    ${cabecera}${form}${panelMesas()}</div>`;
+    ${cabecera}${bloqueIngesta}${form}${panelMesas()}</div>`;
 }
 
 // Le dije al usuario "las mesas son filas, cambialas" -- y solo se
@@ -702,7 +821,33 @@ function renderMercado() {
   cablearMercado();
 }
 
+async function lanzarIngesta(manual) {
+  state.ingesta = { estado: 'trayendo' };
+  renderMercado();
+  try {
+    const r = await importarBriefing();
+    state.ingesta = { estado: 'ok', traidos: r.traidos, desconocidas: r.desconocidas };
+    if (r.traidos) { await loadAll(); renderAll(); return; }
+  } catch (err) {
+    state.ingesta = { estado: 'error', detalle: String(err?.message ?? err) };
+  }
+  renderMercado();
+}
+
 function cablearMercado() {
+  $('ingBtn')?.addEventListener('click', () => lanzarIngesta(true));
+  // Automatica, una vez por carga, y solo si falta el dia de hoy. Es lo
+  // unico que hace que el indice no dependa de que alguien se acuerde.
+  // No atribuye nada a nadie: las filas van sin autor y su fundamento
+  // dice que vienen del briefing.
+  if (canWrite() && !state.ingestaHecha && !state.mercError && state.mesas.some(m => m.activa)) {
+    const hoy = new Date().toISOString().slice(0, 10);
+    if (!state.serie.some(r => r.fecha === hoy)) {
+      state.ingestaHecha = true;
+      lanzarIngesta(false);
+    }
+  }
+
   // Las mesas: el numero sigue al deslizador en vivo, porque sin eso no
   // se sabe que se esta poniendo.
   for (const f of document.querySelectorAll('.mesa-fila')) {

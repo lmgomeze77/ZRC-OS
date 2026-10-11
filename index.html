@@ -24,8 +24,8 @@
   --panel: #FFFFFF;
   --panel-2: #F5F8FC;
   --raise: #E7EDF5;
-  --gold: #8A6D1F;
-  --gold-soft: rgba(138,109,31,.10);
+  --acento: #1F5C9E;
+  --acento-soft: rgba(31,92,158,.10);
   --cream: #0F1C2E;
   --text: #33445C;
   --muted: #5B6B82;
@@ -39,35 +39,34 @@
   --red: #B91C1C;
 
   
-  --b1: #5A4410;
-  --b2: #7A5F18;
-  --b3: #967829;
-  --b4: #B19036;
+  --b1: #0C3764;
+  --b2: #17508C;
+  --b3: #1563B7;
+  --b4: #3E78B6;
   /* DESCARTE no es "la banda mas baja": es un estado terminal. Sale de la
-     rampa de oro y pasa a neutro. Ademas, #5E4D24 daba 2,23:1 sobre el
-     panel -- por debajo del minimo de 3:1 y practicamente ilegible. */
+     rampa y pasa a neutro, para que no se lea como un quinto escalon. */
   --b5: #6B7688;
   /* Segundo acento, solo para el data room. El oro ya significa demasiadas
      cosas (bandas, acciones, la firma), asi que los documentos piden un
      color propio. Cian: separacion del oro de 18,2 (protan) y 20,3 en
      vision normal, contraste 7,6:1 sobre el panel. Validado, no elegido
      a ojo. No se toca el juego de estados (verde/ambar/rojo). */
-  --cyan: #0E7490;
-  --cyan-soft: rgba(14,116,144,.09);
-  --cyan-hi: #075E70;
+  --cyan: #0F766E;
+  --cyan-soft: rgba(15,118,110,.09);
+  --cyan-hi: #0B5E57;
   /* Tokens que faltaban y clavaban el tema oscuro: el fondo de la barra
      fija y el surco vacio de las barras. Con un fondo claro, un rgba de
      navy al 94% deja una franja negra, y un gris al 10% no se ve. */
   --barra: rgba(255,255,255,.93);
   --track: rgba(15,28,46,.11);
   /* Enfasis. --linea-fuerte es la regla que cierra una cabecera de
-     seccion: la linea normal al 12% separa, pero no jerarquiza. --gold-hi
+     seccion: la linea normal al 12% separa, pero no jerarquiza. --acento-hi
      es el oro de hover, que sobre claro tiene que OSCURECER (en el tema
-     oscuro aclaraba). --gold-line es el unico borde de oro que se ve
+     oscuro aclaraba). --acento-line es el unico borde de oro que se ve
      sobre blanco: el oro al 40% daba 1,1:1 contra el panel. */
   --linea-fuerte: rgba(15,28,46,.20);
-  --gold-hi: #6B5312;
-  --gold-line: rgba(138,109,31,.45);
+  --acento-hi: #17446F;
+  --acento-line: rgba(31,92,158,.45);
   --wash: rgba(15,28,46,.035);
 
   --mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -80,7 +79,7 @@ html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
 
 body {
   background:
-    radial-gradient(circle at 50% -8%, rgba(138,109,31,.06), transparent 38%),
+    radial-gradient(circle at 50% -8%, rgba(31,92,158,.06), transparent 38%),
     var(--bg);
   color: var(--text);
   font-family: var(--body);
@@ -92,11 +91,11 @@ body {
 
 button, input, select { font: inherit; color: inherit; }
 button { background: none; border: none; cursor: pointer; }
-:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; border-radius: 2px; }
-::selection { background: rgba(138,109,31,.18); color: var(--cream); }
+:focus-visible { outline: 2px solid var(--acento); outline-offset: 2px; border-radius: 2px; }
+::selection { background: rgba(31,92,158,.18); color: var(--cream); }
 ::-webkit-scrollbar { width: 7px; height: 7px; }
 ::-webkit-scrollbar-track { background: var(--bg); }
-::-webkit-scrollbar-thumb { background: rgba(138,109,31,.28); border-radius: 4px; }
+::-webkit-scrollbar-thumb { background: rgba(31,92,158,.28); border-radius: 4px; }
 
 .shell { max-width: 1120px; margin: 0 auto; padding-left: 24px; padding-right: 24px; }
 /* En pantalla de trabajo el ancho de lectura deja de mandar: manda el area
@@ -111,7 +110,7 @@ button { background: none; border: none; cursor: pointer; }
 
 .eyebrow {
   font-family: var(--mono); font-size: 9px; font-weight: 700;
-  letter-spacing: 2.2px; text-transform: uppercase; color: var(--gold);
+  letter-spacing: 2.2px; text-transform: uppercase; color: var(--acento);
 }
 .sec-note { color: var(--muted); font-size: 12.5px; max-width: 68ch; }
 
@@ -132,7 +131,7 @@ button { background: none; border: none; cursor: pointer; }
   font-size: clamp(34px, 7vw, 46px); line-height: 1; letter-spacing: -.5px;
   margin: 10px 0 6px;
 }
-.wordmark span { color: var(--gold); }
+.wordmark span { color: var(--acento); }
 .tagline { color: var(--muted); font-size: 13px; max-width: 54ch; }
 
 .stamp { text-align: right; flex-shrink: 0; }
@@ -145,7 +144,7 @@ button { background: none; border: none; cursor: pointer; }
   font-family: var(--mono); font-size: 9px; letter-spacing: 1.3px;
 }
 .nav a { color: var(--muted); text-decoration: none; transition: color .18s; }
-.nav a:hover, .nav a:focus-visible { color: var(--gold); }
+.nav a:hover, .nav a:focus-visible { color: var(--acento); }
 
 .govern {
   margin-top: 22px; padding: 16px 18px;
@@ -161,7 +160,7 @@ button { background: none; border: none; cursor: pointer; }
 .govern p + p { margin-top: 8px; }
 .govern code {
   font-family: var(--mono); font-size: 12px; color: var(--cream);
-  background: var(--gold-soft); padding: 1px 5px; border-radius: 2px;
+  background: var(--acento-soft); padding: 1px 5px; border-radius: 2px;
 }
 
 .section { box-shadow: none; }
@@ -180,7 +179,7 @@ button { background: none; border: none; cursor: pointer; }
 }
 .sec-head::after {
   content: ''; position: absolute; left: 0; bottom: -2px;
-  width: 54px; height: 2px; background: var(--gold);
+  width: 54px; height: 2px; background: var(--acento);
 }
 .sec-title {
   color: var(--cream); font-family: var(--display);
@@ -225,7 +224,7 @@ button { background: none; border: none; cursor: pointer; }
   grid-template-columns: auto 1fr auto; align-items: start;
 }
 .q-rank {
-  font-family: var(--mono); font-size: 10px; font-weight: 700; color: var(--gold);
+  font-family: var(--mono); font-size: 10px; font-weight: 700; color: var(--acento);
   letter-spacing: .5px; padding-top: 3px; min-width: 22px;
 }
 .q-title { color: var(--cream); font-family: var(--display); font-size: 18px; font-weight: 600; line-height: 1.25; }
@@ -234,7 +233,7 @@ button { background: none; border: none; cursor: pointer; }
   margin-top: 7px; font-family: var(--mono); font-size: 10px;
   letter-spacing: .6px; color: var(--muted);
 }
-.q-act b { color: var(--gold); font-weight: 700; }
+.q-act b { color: var(--acento); font-weight: 700; }
 .q-side { display: flex; flex-direction: column; align-items: flex-end; gap: 7px; }
 
 .pill {
@@ -269,8 +268,8 @@ button { background: none; border: none; cursor: pointer; }
   box-shadow: 0 1px 1px rgba(15,28,46,.05);
   transition: border-color .18s, color .18s, background .18s;
 }
-.toolbar select:hover, .tbtn:hover { border-color: var(--gold); color: var(--cream); background: var(--raise); }
-.tbtn[aria-pressed="true"] { color: #fff; background: var(--gold); border-color: var(--gold-hi); font-weight: 700;
+.toolbar select:hover, .tbtn:hover { border-color: var(--acento); color: var(--cream); background: var(--raise); }
+.tbtn[aria-pressed="true"] { color: #fff; background: var(--acento); border-color: var(--acento-hi); font-weight: 700;
   box-shadow: inset 0 -2px 0 rgba(15,28,46,.22); }
 .tbtn:active { transform: translateY(1px); }
 .toolbar-count { margin-left: auto; font-family: var(--mono); font-size: 9.5px; color: var(--muted); letter-spacing: .6px; }
@@ -284,14 +283,14 @@ table.pipe thead th {
   border-bottom: 1px solid var(--line); white-space: nowrap;
 }
 table.pipe thead th.sortable { cursor: pointer; }
-table.pipe thead th.sortable:hover { color: var(--gold); }
+table.pipe thead th.sortable:hover { color: var(--acento); }
 table.pipe tbody tr {
   background: var(--panel); cursor: pointer;
   border-bottom: 1px solid var(--line-2);
   transition: background .15s;
 }
 table.pipe tbody tr:hover, table.pipe tbody tr:focus-visible { background: var(--raise); }
-table.pipe tbody tr[aria-selected="true"] { background: var(--raise); box-shadow: inset 3px 0 0 var(--gold); }
+table.pipe tbody tr[aria-selected="true"] { background: var(--raise); box-shadow: inset 3px 0 0 var(--acento); }
 table.pipe td { padding: 11px 12px; vertical-align: middle; font-size: 13.5px; }
 .td-code { font-family: var(--mono); font-size: 9.5px; color: var(--muted); letter-spacing: .4px; white-space: nowrap; }
 .td-name { color: var(--cream); font-family: var(--display); font-size: 16px; font-weight: 600; line-height: 1.25; }
@@ -368,10 +367,10 @@ table.pipe td { padding: 11px 12px; vertical-align: middle; font-size: 13.5px; }
   transition: background .15s ease, color .15s ease;
 }
 .seg button:last-child { border-right: none; }
-.seg button:hover { color: var(--cream); background: rgba(138,109,31,.07); }
+.seg button:hover { color: var(--cream); background: rgba(31,92,158,.07); }
 .seg button[data-pane="drPane"] { color: var(--cyan); }
 .seg button[data-pane="drPane"]:hover { background: var(--cyan-soft); color: var(--cyan-hi); }
-.seg button[aria-selected="true"] { background: var(--gold); color: #fff;
+.seg button[aria-selected="true"] { background: var(--acento); color: #fff;
   box-shadow: inset 0 -2px 0 rgba(15,28,46,.22); }
 .seg button[data-pane="drPane"][aria-selected="true"] { background: var(--cyan); color: #fff;
   box-shadow: inset 0 -2px 0 rgba(15,28,46,.22); }
@@ -439,14 +438,28 @@ section.section, .work-main { scroll-margin-top: 66px; }
 
 /* Reserva y decision no caben en la columna estrecha: en pila se comian
    mil pixeles de alto. Van en una fila ancha propia, en paralelo. */
+/* auto-fit repartia estas tarjetas en 2 columnas con 3 tarjetas, asi que
+   la tercera se quedaba sola y perdia media fila: 372 px en un iPad
+   vertical y 306 px en un portatil. Y no se arregla afinando el minmax,
+   porque hacen falta 1 o 2 columnas segun el ancho pero nunca un
+   huerfano, y una sola expresion auto-fit no puede decir eso.
+   Dos columnas fijas, y la reserva -- que es corta -- a todo lo ancho:
+   asi las dos altas (decisiones y desenlace) quedan emparejadas y no
+   hay hueco al lado de la corta. Funciona con 1, 2 o 3 tarjetas, que
+   son los tres casos reales segun el rol. */
 .detail-gov { display: grid; gap: 18px; align-items: start;
-  grid-template-columns: repeat(auto-fit, minmax(275px, 1fr)); }
+  grid-template-columns: 1fr; }
+@media (min-width: 700px) {
+  .detail-gov { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+.detail-gov > .reserva     { grid-column: 1 / -1; }
+.detail-gov > :only-child  { grid-column: 1 / -1; }
 .detail-gov > .reserva, .detail-gov > .decision { margin-top: 18px; }
 
 .dim-row { padding: 9px 0; border-bottom: 1px solid var(--line-2); }
 .dim-row:last-child { border-bottom: none; }
 .dim-top { display: flex; align-items: center; gap: 10px; }
-.dim-code { font-family: var(--mono); font-size: 10px; font-weight: 700; color: var(--gold); min-width: 22px; }
+.dim-code { font-family: var(--mono); font-size: 10px; font-weight: 700; color: var(--acento); min-width: 22px; }
 .dim-name { font-size: 13px; color: var(--text); flex: 1; min-width: 0; }
 .dim-w { font-family: var(--mono); font-size: 9px; color: var(--faint); letter-spacing: .5px; }
 .dim-val { font-family: var(--mono); font-size: 13px; font-weight: 700; color: var(--cream); min-width: 22px; text-align: right; font-variant-numeric: tabular-nums; }
@@ -458,12 +471,12 @@ section.section, .work-main { scroll-margin-top: 66px; }
 .dim-top { gap: 12px; }
 .dim-top .dim-w { margin-left: auto; }
 .dim-track { flex: 1; height: 6px; background: var(--track); border-radius: 3px; overflow: hidden; }
-.dim-fill { display: block; height: 100%; background: var(--gold); border-radius: 3px; transition: width .3s ease; }
+.dim-fill { display: block; height: 100%; background: var(--acento); border-radius: 3px; transition: width .3s ease; }
 
-.dim-row.is-lever { background: rgba(138,109,31,.05); box-shadow: inset 2px 0 0 var(--gold); padding-left: 10px; margin-left: -10px; }
+.dim-row.is-lever { background: rgba(31,92,158,.05); box-shadow: inset 2px 0 0 var(--acento); padding-left: 10px; margin-left: -10px; }
 .lever-tag {
   font-family: var(--mono); font-size: 7.5px; font-weight: 700; letter-spacing: 1px;
-  color: #fff; background: var(--gold); padding: 2px 5px; border-radius: 2px; flex-shrink: 0;
+  color: #fff; background: var(--acento); padding: 2px 5px; border-radius: 2px; flex-shrink: 0;
 }
 .dim-anchor { font-size: 11.5px; color: var(--muted); margin-top: 6px; font-style: italic; line-height: 1.45; }
 
@@ -472,14 +485,14 @@ section.section, .work-main { scroll-margin-top: 66px; }
 .dim-slider::-moz-range-track { height: 2px; background: var(--track); border-radius: 2px; }
 .dim-slider::-webkit-slider-thumb {
   -webkit-appearance: none; appearance: none; width: 11px; height: 11px; border-radius: 50%;
-  background: var(--gold); border: 2px solid var(--panel); margin-top: -4.5px;
+  background: var(--acento); border: 2px solid var(--panel); margin-top: -4.5px;
 }
-.dim-slider::-moz-range-thumb { width: 11px; height: 11px; border-radius: 50%; background: var(--gold); border: 2px solid var(--panel); }
+.dim-slider::-moz-range-thumb { width: 11px; height: 11px; border-radius: 50%; background: var(--acento); border: 2px solid var(--panel); }
 
 .gonogo { border: 1px solid var(--line-2); background: var(--panel-2); padding: 15px 16px; }
 .gonogo h4 {
   font-family: var(--mono); font-size: 9px; font-weight: 700; letter-spacing: 1.3px;
-  color: var(--gold); text-transform: uppercase; margin-bottom: 11px;
+  color: var(--acento); text-transform: uppercase; margin-bottom: 11px;
 }
 .gg-item { display: flex; gap: 9px; align-items: flex-start; padding: 6px 0; border-bottom: 1px solid var(--line-2); font-size: 12.5px; }
 .gg-item:last-child { border-bottom: none; }
@@ -499,19 +512,24 @@ section.section, .work-main { scroll-margin-top: 66px; }
 
 .lever {
   margin-top: 16px; padding: 13px 15px;
-  border-left: 2px solid var(--gold); background: rgba(138,109,31,.05);
+  border-left: 2px solid var(--acento); background: rgba(31,92,158,.05);
 }
-.lever h4 { font-family: var(--mono); font-size: 9px; font-weight: 700; letter-spacing: 1.3px; color: var(--gold); margin-bottom: 7px; }
+.lever h4 { font-family: var(--mono); font-size: 9px; font-weight: 700; letter-spacing: 1.3px; color: var(--acento); margin-bottom: 7px; }
 .lever p { font-size: 13px; color: var(--text); }
 
 .scope-notes { margin-top: 14px; display: flex; flex-direction: column; gap: 8px; }
 .scope-note { font-size: 12.5px; color: var(--text); display: flex; gap: 9px; align-items: flex-start; }
 
-.cal-grid { display: grid; gap: 18px; grid-template-columns: repeat(auto-fit, minmax(290px, 1fr)); }
+/* Cuatro tarjetas en tres columnas dejaban una sola abajo y tiraban 715
+   px de ancho en un iPad. Con cuatro, las divisiones que no dejan
+   huerfano son 1, 2 y 4; tres nunca. */
+.cal-grid { display: grid; gap: 18px; grid-template-columns: 1fr; }
+@media (min-width: 620px)  { .cal-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (min-width: 1500px) { .cal-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
 .card { border: 1px solid var(--line-2); background: var(--panel); padding: 17px 18px; }
 .card h3 {
   font-family: var(--mono); font-size: 9px; font-weight: 700; letter-spacing: 1.3px;
-  color: var(--gold); text-transform: uppercase; margin-bottom: 4px;
+  color: var(--acento); text-transform: uppercase; margin-bottom: 4px;
 }
 .card .card-note { font-size: 12px; color: var(--muted); margin-bottom: 14px; }
 
@@ -532,7 +550,7 @@ section.section, .work-main { scroll-margin-top: 66px; }
 
 .layers { display: flex; flex-direction: column; gap: 1px; background: var(--line-2); border: 1px solid var(--line-2); }
 .layer { background: var(--panel); padding: 13px 16px; display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
-.layer-n { font-family: var(--mono); font-size: 10px; font-weight: 700; color: var(--gold); min-width: 54px; letter-spacing: .6px; }
+.layer-n { font-family: var(--mono); font-size: 10px; font-weight: 700; color: var(--acento); min-width: 54px; letter-spacing: .6px; }
 .layer-name { color: var(--cream); font-family: var(--display); font-size: 17px; font-weight: 600; min-width: 150px; }
 .layer-desc { font-size: 12.5px; color: var(--muted); flex: 1; min-width: 190px; }
 
@@ -589,7 +607,7 @@ section.section, .work-main { scroll-margin-top: 66px; }
 .ck-bar { height: 7px; background: var(--track); border-radius: 4px; overflow: hidden; margin-top: 5px; }
 .ck-bar i { display: block; height: 100%; background: var(--green); transition: width .3s ease; }
 .ck-num { font-family: var(--mono); font-size: 9.5px; color: var(--faint); }
-.ck-area { font-family: var(--mono); font-size: 9px; letter-spacing: .6px; color: var(--gold); }
+.ck-area { font-family: var(--mono); font-size: 9px; letter-spacing: .6px; color: var(--acento); }
 .p-critica { color: var(--red); } .p-alta { color: var(--amber); } .p-media { color: var(--text); }
 .e-pendiente  { color: var(--faint); } .e-solicitado { color: var(--amber); }
 .e-recibido   { color: var(--text); }  .e-validado   { color: var(--green); }
@@ -599,7 +617,7 @@ table.pipe td select.ck-est { background: var(--panel-2); border: 1px solid var(
 /* ── FORMULARIOS ──────────────────────────────────────────────────────── */
 .frm { border: 1px solid var(--line); background: var(--panel-2); padding: 17px 18px; margin-top: 18px; }
 .frm h4 { font-family: var(--mono); font-size: 9px; font-weight: 700; letter-spacing: 1.3px;
-  color: var(--gold); text-transform: uppercase; margin-bottom: 14px; }
+  color: var(--acento); text-transform: uppercase; margin-bottom: 14px; }
 .frm-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); }
 .fld { display: flex; flex-direction: column; gap: 5px; }
 .fld.ancho { grid-column: 1 / -1; }
@@ -612,19 +630,19 @@ table.pipe td select.ck-est { background: var(--panel-2); border: 1px solid var(
 }
 .fld textarea { font-size: 13px; line-height: 1.55; resize: vertical; min-height: 68px; }
 .fld input:focus, .fld select:focus, .fld textarea:focus {
-  outline: none; border-color: var(--gold-line); }
+  outline: none; border-color: var(--acento-line); }
 .fld.check { flex-direction: row; align-items: center; gap: 9px; }
-.fld.check input { width: 16px; height: 16px; accent-color: var(--gold); flex-shrink: 0; }
+.fld.check input { width: 16px; height: 16px; accent-color: var(--acento); flex-shrink: 0; }
 .fld.check label { text-transform: none; font-size: 12px; letter-spacing: .2px; color: var(--text); }
 .fld .pista { font-family: var(--body); font-size: 11.5px; color: var(--muted);
   line-height: 1.5; text-transform: none; letter-spacing: 0; }
 
-.btn-oro { padding: 12px 20px; background: var(--gold); color: #fff; border: none;
+.btn-oro { padding: 12px 20px; background: var(--acento); color: #fff; border: none;
   border-radius: 3px; font-family: var(--mono); font-size: 10px; font-weight: 700;
   letter-spacing: 1.3px; cursor: pointer; margin-top: 14px;
   box-shadow: 0 1px 2px rgba(15,28,46,.18), inset 0 1px 0 rgba(255,255,255,.12);
   transition: background .15s ease, box-shadow .15s ease, transform .06s ease; }
-.btn-oro:hover { background: var(--gold-hi); box-shadow: 0 2px 5px rgba(15,28,46,.22); }
+.btn-oro:hover { background: var(--acento-hi); box-shadow: 0 2px 5px rgba(15,28,46,.22); }
 /* Que el boton se hunda al pulsarlo. Es la unica confirmacion inmediata
    que hay: el guardado tarda, y sin esto parece que no ha pasado nada. */
 .btn-oro:active { transform: translateY(1px); box-shadow: 0 1px 1px rgba(15,28,46,.2); }
@@ -637,9 +655,9 @@ table.pipe td select.ck-est { background: var(--panel-2); border: 1px solid var(
 /* Decision y desenlace: mismo patron que .reserva, pero en el color de la
    casa en vez del rojo. Registrar un desenlace no es una alarma. */
 .decision { margin-top: 16px; border: 1px solid var(--line);
-  border-left: 3px solid var(--gold); background: rgba(197,160,89,.04); padding: 14px 15px; }
+  border-left: 3px solid var(--acento); background: rgba(31,92,158,.035); padding: 14px 15px; }
 .decision h4 { font-family: var(--mono); font-size: 9px; font-weight: 700; letter-spacing: 1.3px;
-  color: var(--gold); text-transform: uppercase; margin-bottom: 10px; }
+  color: var(--acento); text-transform: uppercase; margin-bottom: 10px; }
 .decision .pista { font-size: 11.5px; color: var(--muted); line-height: 1.5; margin-top: 8px; }
 .decision h5 { font-family: var(--mono); font-size: 8.5px; font-weight: 700; letter-spacing: 1.1px;
   color: var(--faint); text-transform: uppercase; margin: 16px 0 8px; }
@@ -660,7 +678,7 @@ table.pipe td select.ck-est { background: var(--panel-2); border: 1px solid var(
    firmada. Se parece a un enlace porque hace lo mismo para el que mira. */
 .doc-fuente { font-family: var(--mono); font-size: 8px; font-weight: 700; letter-spacing: 1px;
   padding: 2px 6px; border: 1px solid; border-radius: 2px; }
-.doc-fuente.f-fichero { color: var(--cyan); border-color: rgba(79,182,214,.4); }
+.doc-fuente.f-fichero { color: var(--cyan); border-color: rgba(15,118,110,.4); }
 .doc-fuente.f-enlace  { color: var(--text); border-color: var(--line-2); }
 .doc-fuente.f-hueco   { color: var(--amber); border-color: rgba(180,83,9,.35); }
 .doc-acc { white-space: nowrap; text-align: right; }
@@ -669,7 +687,7 @@ table.pipe td select.ck-est { background: var(--panel-2); border: 1px solid var(
   background: var(--panel-2); border: 1px solid var(--line); border-radius: 2px;
   color: var(--text); font-family: var(--mono); font-size: 10px; letter-spacing: .6px;
   padding: 7px 10px; min-width: 220px; }
-.ck-cab input[type=search]:focus { outline: none; border-color: var(--gold-line); }
+.ck-cab input[type=search]:focus { outline: none; border-color: var(--acento-line); }
 
 .doc-abrir { background: none; border: none; padding: 0; cursor: pointer;
   font-family: var(--mono); font-size: 9.5px; font-weight: 700; letter-spacing: 1.1px;
@@ -682,7 +700,7 @@ table.pipe td select.ck-est { background: var(--panel-2); border: 1px solid var(
 .doc-adj { display: inline-block; margin-top: 8px; cursor: pointer;
   font-family: var(--mono); font-size: 8.5px; font-weight: 700; letter-spacing: 1px;
   text-transform: uppercase; color: var(--cyan);
-  border: 1px solid rgba(79,182,214,.4); border-radius: 2px; padding: 5px 10px; }
+  border: 1px solid rgba(15,118,110,.4); border-radius: 2px; padding: 5px 10px; }
 .doc-adj:hover { background: var(--cyan-soft); color: var(--cyan-hi); }
 .doc-adj input { display: none; }
 .fld input[type=file] {
@@ -697,7 +715,7 @@ table.pipe td select.ck-est { background: var(--panel-2); border: 1px solid var(
    dialogo aparte: la casilla sin lo que se encontro no es memoria. */
 .ck-nota { margin-top: 6px; padding: 7px 10px; border-left: 2px solid var(--cyan);
   background: var(--cyan-soft); font-size: 12.5px; color: var(--text); line-height: 1.5; }
-.ck-resp { color: var(--gold); }
+.ck-resp { color: var(--acento); }
 /* El reloj. Vencido usa el rojo de estado, que es exactamente lo que
    es, y nunca se queda en color solo: lleva siempre su texto. */
 /* La bandeja de hoy. Filas densas, una linea por cosa: es para mirarla
@@ -714,7 +732,7 @@ table.pipe td select.ck-est { background: var(--panel-2); border: 1px solid var(
 .hoy-eti { font-family: var(--mono); font-size: 8px; letter-spacing: 1px;
   text-transform: uppercase; color: var(--faint); }
 .hoy-mio { font-family: var(--mono); font-size: 8px; font-weight: 700; letter-spacing: 1px;
-  color: #fff; background: var(--gold); padding: 2px 5px; border-radius: 2px; }
+  color: #fff; background: var(--acento); padding: 2px 5px; border-radius: 2px; }
 .sec-ref.es-vencido { color: var(--red); }
 @media (max-width: 560px) {
   .hoy-fila { gap: 7px; }
@@ -760,14 +778,14 @@ table.pipe td select.ck-est { background: var(--panel-2); border: 1px solid var(
   box-shadow: 0 1px 1px rgba(15,28,46,.05);
   transition: border-color .18s, color .18s, background .18s;
 }
-.tbtn:hover { border-color: var(--gold-line); color: var(--cream); }
+.tbtn:hover { border-color: var(--acento-line); color: var(--cream); }
 
 /* El alta es la unica accion de la barra que CREA algo, y no puede
    leerse igual que un filtro. Se separa a la derecha y lleva el oro. */
-.tbtn-alta { margin-left: auto; border-color: var(--gold) !important; color: var(--gold) !important; }
-.tbtn-alta:hover { background: var(--gold-soft) !important; color: var(--gold-hi) !important; }
-.tbtn-alta[aria-expanded="true"] { background: var(--gold) !important; color: #fff !important;
-  border-color: var(--gold-hi) !important; }
+.tbtn-alta { margin-left: auto; border-color: var(--acento) !important; color: var(--acento) !important; }
+.tbtn-alta:hover { background: var(--acento-soft) !important; color: var(--acento-hi) !important; }
+.tbtn-alta[aria-expanded="true"] { background: var(--acento) !important; color: #fff !important;
+  border-color: var(--acento-hi) !important; }
 @media (max-width: 720px) { .tbtn-alta { margin-left: 0; width: 100%; } }
 .alta-aviso { grid-column: 1 / -1; margin-top: -4px; }
 
@@ -779,7 +797,7 @@ table.pipe td select.ck-est { background: var(--panel-2); border: 1px solid var(
 @media (max-width: 1000px) { .merc-grid { grid-template-columns: 1fr; } }
 .merc-col > .card { height: 100%; }
 .merc-tit { font-family: var(--mono); font-size: 9px; font-weight: 700; letter-spacing: 1.3px;
-  text-transform: uppercase; color: var(--gold); margin-bottom: 4px; }
+  text-transform: uppercase; color: var(--acento); margin-bottom: 4px; }
 .merc-dir { font-family: var(--mono); font-size: 8.5px; letter-spacing: .8px;
   text-transform: uppercase; color: var(--faint); margin-bottom: 14px; }
 .merc-num { display: flex; align-items: baseline; gap: 10px; margin-bottom: 2px; }
@@ -801,11 +819,11 @@ table.pipe td select.ck-est { background: var(--panel-2); border: 1px solid var(
   color: var(--faint); letter-spacing: .3px; margin-top: 2px; }
 .mesa-val { font-family: var(--mono); font-size: 14px; font-weight: 700; text-align: right;
   color: var(--cream); font-variant-numeric: tabular-nums; }
-.mesa-fila input[type=range] { grid-column: 1 / -1; width: 100%; accent-color: var(--gold); }
+.mesa-fila input[type=range] { grid-column: 1 / -1; width: 100%; accent-color: var(--acento); }
 .mesa-fila input[type=text] { grid-column: 1 / -1; width: 100%; background: var(--panel-2);
   border: 1px solid var(--line); border-radius: 2px; color: var(--text);
   font-family: var(--body); font-size: 12px; padding: 7px 9px; }
-.mesa-fila input[type=text]:focus { outline: none; border-color: var(--gold-line); }
+.mesa-fila input[type=text]:focus { outline: none; border-color: var(--acento-line); }
 .mesa-sinfund { color: var(--amber); }
 /* Una mesa sin leer no se disfraza de cero ni de cincuenta: se queda en
    raya, y el deslizador esta donde esta solo porque tiene que estar en
@@ -828,7 +846,7 @@ table.pipe td select.ck-est { background: var(--panel-2); border: 1px solid var(
 .sec-nom { color: var(--cream); font-weight: 600; }
 .sec-barra { display: block; height: 7px; background: var(--track); border-radius: 4px;
   overflow: hidden; margin-top: 6px; }
-.sec-barra i { display: block; height: 100%; background: var(--gold); }
+.sec-barra i { display: block; height: 100%; background: var(--acento); }
 .sec-score { font-family: var(--mono); font-size: 15px; font-weight: 700; color: var(--cream);
   font-variant-numeric: tabular-nums; }
 .sec-score.es-parcial { color: var(--muted); }
@@ -879,7 +897,7 @@ table.pipe td select.ck-est { background: var(--panel-2); border: 1px solid var(
 .dr-tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
 .dr-grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(270px, 1fr)); }
 .dr-cat { font-family: var(--mono); font-size: 9px; font-weight: 700; letter-spacing: 1.3px;
-  color: var(--gold); text-transform: uppercase; margin: 18px 0 10px;
+  color: var(--acento); text-transform: uppercase; margin: 18px 0 10px;
   border-bottom: 1px solid var(--line); padding-bottom: 7px; }
 .dr-cat:first-child { margin-top: 0; }
 .doc { border: 1px solid var(--line-2); background: var(--panel); padding: 15px 16px;
@@ -887,7 +905,7 @@ table.pipe td select.ck-est { background: var(--panel-2); border: 1px solid var(
 .doc h4 { color: var(--cream); font-family: var(--display); font-size: 16px;
   font-weight: 600; line-height: 1.3; }
 .doc p { color: var(--muted); font-size: 12.5px; line-height: 1.5; margin-top: 5px; }
-.doc a { display: block; text-align: center; padding: 9px; background: var(--gold);
+.doc a { display: block; text-align: center; padding: 9px; background: var(--acento);
   color: #fff; text-decoration: none; font-family: var(--mono); font-size: 9.5px;
   font-weight: 700; letter-spacing: 1.2px; }
 .doc a:hover { background: var(--cream); }
@@ -906,7 +924,7 @@ table.pipe td select.ck-est { background: var(--panel-2); border: 1px solid var(
 
 .prosa { border: 1px solid var(--line-2); background: var(--panel); padding: 17px 18px; margin-bottom: 14px; }
 .prosa h4 { font-family: var(--mono); font-size: 9px; font-weight: 700; letter-spacing: 1.3px;
-  color: var(--gold); text-transform: uppercase; margin-bottom: 9px; }
+  color: var(--acento); text-transform: uppercase; margin-bottom: 9px; }
 .prosa p { font-size: 13.5px; color: var(--text); line-height: 1.6; }
 
 .oculto { display: inline-flex; align-items: center; gap: 6px; color: var(--amber);
@@ -915,19 +933,19 @@ table.pipe td select.ck-est { background: var(--panel-2); border: 1px solid var(
 /* ── ACCESO ────────────────────────────────────────────────────────────── */
 #auth { position: fixed; inset: 0; z-index: 999; display: flex; align-items: center;
   justify-content: center; padding: 24px;
-  background: radial-gradient(circle at 50% 12%, rgba(138,109,31,.07), transparent 42%), var(--bg); }
+  background: radial-gradient(circle at 50% 12%, rgba(31,92,158,.07), transparent 42%), var(--bg); }
 .abox { width: min(430px,100%); border: 1px solid var(--line); background: var(--panel); padding: 30px 28px; }
 .abox h1 { color: var(--cream); font-family: var(--display); font-weight: 600; font-size: 38px;
   line-height: 1; letter-spacing: -.5px; margin: 14px 0 10px; }
-.abox h1 span { color: var(--gold); }
+.abox h1 span { color: var(--acento); }
 .abox p { color: var(--muted); font-size: 12.5px; line-height: 1.6; margin-bottom: 20px; }
 .abox input { width: 100%; padding: 12px 13px; background: var(--bg); border: 1px solid var(--line);
   color: var(--cream); font-family: var(--mono); font-size: 13px; margin-bottom: 11px; }
-.abox input:focus { outline: none; border-color: var(--gold-line); }
-.abox button { width: 100%; padding: 12px; background: var(--gold); color: #fff;
+.abox input:focus { outline: none; border-color: var(--acento-line); }
+.abox button { width: 100%; padding: 12px; background: var(--acento); color: #fff;
   font-family: var(--mono); font-size: 10px; font-weight: 700; letter-spacing: 1.6px;
   cursor: pointer; border: none; }
-.abox button:hover { background: var(--gold-hi); }
+.abox button:hover { background: var(--acento-hi); }
 .abox button:active { transform: translateY(1px); }
 .abox button[disabled] { opacity: .55; cursor: progress; transform: none; }
 .amsg { margin-top: 12px; font-family: var(--mono); font-size: 10px; letter-spacing: .5px;
@@ -942,11 +960,11 @@ table.pipe td select.ck-est { background: var(--panel-2); border: 1px solid var(
 .rolepill { font-family: var(--mono); font-size: 8.5px; font-weight: 700; letter-spacing: 1px;
   padding: 3px 8px; border: 1px solid currentColor; border-radius: 2px; }
 .rolepill.reader { color: var(--text); }
-.rolepill.writer { color: var(--gold); }
+.rolepill.writer { color: var(--acento); }
 .rolepill.admin  { color: var(--green); }
 .linkbtn { background: none; border: none; color: var(--muted); cursor: pointer;
   font-family: var(--mono); font-size: 9.5px; letter-spacing: .6px; text-decoration: underline; padding: 0; }
-.linkbtn:hover { color: var(--gold); }
+.linkbtn:hover { color: var(--acento); }
 
 .readonly-note { margin-top: 14px; padding: 11px 13px; border-left: 2px solid var(--text);
   background: var(--wash); font-size: 12.5px; color: var(--text); }
@@ -961,12 +979,12 @@ table.pipe td select.ck-est { background: var(--panel-2); border: 1px solid var(
    Neutro, con el acento de la casa, y con el nombre del fichero
    destacado, que es lo unico que hay que hacer. */
 .pendiente { margin-top: 12px; padding: 15px 17px; border: 1px solid var(--line);
-  border-left: 3px solid var(--gold); background: var(--panel-2); border-radius: 3px; }
-.pendiente b { display: block; color: var(--gold); font-family: var(--mono);
+  border-left: 3px solid var(--acento); background: var(--panel-2); border-radius: 3px; }
+.pendiente b { display: block; color: var(--acento); font-family: var(--mono);
   font-size: 9px; font-weight: 700; letter-spacing: 1.3px; margin-bottom: 7px; }
 .pendiente p { font-size: 12.5px; color: var(--text); line-height: 1.55; max-width: 74ch; }
 .pendiente code { font-family: var(--mono); font-size: 11.5px; color: var(--cream);
-  background: var(--gold-soft); border: 1px solid var(--gold-line);
+  background: var(--acento-soft); border: 1px solid var(--acento-line);
   padding: 2px 6px; border-radius: 2px; white-space: nowrap; }
 .pendiente-pie { margin-top: 7px; color: var(--faint); font-size: 11.5px; }
 

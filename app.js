@@ -299,7 +299,7 @@ function sparkline(serie) {
     const last = i === serie.length - 1;
     if (r.estado === 'publicado' && !last) return '';
     const cx = x(i).toFixed(1), cy = y(r.valor).toFixed(1);
-    if (last) return `<circle cx="${cx}" cy="${cy}" r="3" fill="var(--gold)" stroke="var(--panel)" stroke-width="1.5"></circle>`;
+    if (last) return `<circle cx="${cx}" cy="${cy}" r="3" fill="var(--acento)" stroke="var(--panel)" stroke-width="1.5"></circle>`;
     return `<circle cx="${cx}" cy="${cy}" r="2.4" fill="var(--panel)" stroke="${
       r.estado === 'reconstruido' ? 'var(--faint)' : 'var(--amber)'}" stroke-width="1.2"></circle>`;
   }).join('');
@@ -307,11 +307,11 @@ function sparkline(serie) {
     aria-label="Índice de riesgo ZRC, ${serie.length} días, de ${vals[0]} a ${vals[vals.length-1]}"
     preserveAspectRatio="none" style="display:block;max-width:100%">
     <defs><linearGradient id="sparkG" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="var(--gold)" stop-opacity=".22"></stop>
-      <stop offset="100%" stop-color="var(--gold)" stop-opacity="0"></stop>
+      <stop offset="0%" stop-color="var(--acento)" stop-opacity=".22"></stop>
+      <stop offset="100%" stop-color="var(--acento)" stop-opacity="0"></stop>
     </linearGradient></defs>
     <path d="${area}" fill="url(#sparkG)"></path>
-    <path d="${d}" fill="none" stroke="var(--gold)" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"></path>
+    <path d="${d}" fill="none" stroke="var(--acento)" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"></path>
     ${dots}</svg>`;
 }
 
@@ -329,7 +329,7 @@ function tarjetaRiesgo() {
     <div class="stat-value">${ult.valor}<small>${flecha} ${Math.abs(delta)}</small></div>
     <div class="spark-wrap">${sparkline(tramoContinuo(serie).tramo)}</div>
     <div class="spark-legend">
-      <span><i style="background:var(--gold)"></i>Publicado</span>
+      <span><i style="background:var(--acento)"></i>Publicado</span>
       <span><i style="border:1.2px solid var(--amber)"></i>Degradado</span>
       <span><i style="border:1.2px solid var(--faint)"></i>Reconstruido</span>
     </div>
@@ -1025,7 +1025,7 @@ function panelDecision(r) {
   return `<div class="decision">
     <h4>⚖ Decisiones</h4>${historial}
     <div class="frm-grid" style="margin-top:12px">
-      <div class="fld"><label for="decTipo">Nueva decisión</label>
+      <div class="fld ancho"><label for="decTipo">Nueva decisión</label>
         <select id="decTipo">${opts(DEC_TIPO)}</select></div>
       <div class="fld ancho"><label for="decMotivo">Motivo · obligatorio</label>
         <textarea id="decMotivo" placeholder="Por qué se decide esto, con la información que hay hoy."></textarea></div>
@@ -1039,7 +1039,7 @@ function panelDecision(r) {
   <div class="decision">
     <h4>◈ Desenlace</h4>${desenlace}
     <div class="frm-grid" style="margin-top:12px">
-      <div class="fld"><label for="outRes">Resultado</label>
+      <div class="fld ancho"><label for="outRes">Resultado</label>
         <select id="outRes">${opts(RESULTADO, out?.resultado)}</select></div>
       <div class="fld"><label for="outFecha">Fecha</label>
         <input id="outFecha" type="date" value="${esc(soloFecha(out?.fecha) || hoy)}" /></div>

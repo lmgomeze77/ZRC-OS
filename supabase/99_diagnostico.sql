@@ -26,7 +26,9 @@ col(fichero, que, tabla, columna) as (values
   ('15_plazos.sql','checklist_items.vence_en','checklist_items','vence_en'),
   ('15_plazos.sql','scoring_bands.plazo_horas','scoring_bands','plazo_horas'),
   ('15_plazos.sql','v_pendientes.vence_en','v_pendientes','vence_en'),
-  ('18_sectorial.sql','opportunities.sector','opportunities','sector')
+  ('18_sectorial.sql','opportunities.sector','opportunities','sector'),
+  ('22_metodos.sql','v_risk_serie.metodo','v_risk_serie','metodo'),
+  ('22_metodos.sql','v_risk_estado.brecha','v_risk_estado','brecha')
 ),
 filas as (
   select case when to_regclass('public.'||o.que) is null then '1 · FALTA'
@@ -50,6 +52,27 @@ filas as (
            where tc.table_name='activity' and tc.constraint_type='FOREIGN KEY'
              and tc.constraint_name like '%opportunity_id%' limit 1), '1 · FALTA'),
          '16_actividad.sql', 'activity: borrado sin cascada'
+  union all
+  -- Las nueve mesas del briefing. No basta con que risk_mesas exista:
+  -- si solo lleva las M1..M9 que invente yo, el indice no se puede
+  -- reproducir desde el briefing y la ingesta diaria no casa.
+  select case
+           when to_regclass('public.risk_mesas') is null then '1 · FALTA'
+           when coalesce((xpath('/row/c/text()', query_to_xml(
+                  'select count(*) as c from risk_mesas'
+                  ' where clave = ''macro'' and activa', false, true, '')
+                ))[1]::text, '0') = '0' then '1 · FALTA'
+           else '9 · ok' end,
+         '21_mesas_reales.sql', 'las nueve mesas del briefing'
+  union all
+  -- El ultimo dia con indice de mesas. Es la respuesta directa a "el
+  -- indice sigue parado en una fecha vieja": si aqui sale un dia de
+  -- hace semanas, falta la serie, no el despliegue.
+  select '0 · DATO', '21_mesas_reales.sql', 'ultimo dia con mesas: ' ||
+         coalesce((xpath('/row/c/text()', query_to_xml(
+            'select coalesce(max(fecha)::text, ''ninguno'') as c from v_risk_dia',
+            false, true, '')))[1]::text, 'ninguno')
+    where to_regclass('public.v_risk_dia') is not null
   union all
   select '0 · DATO', 'pipeline', 'expedientes vivos: ' ||
          (select count(*) from opportunities where estado not in ('archivado','cerrado'))

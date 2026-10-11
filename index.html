@@ -561,6 +561,13 @@ section.section, .work-main { scroll-margin-top: 66px; }
   letter-spacing: .5px; line-height: 1.9;
 }
 .foot b { color: var(--muted); font-weight: 500; }
+/* El sello dice que version esta ejecutando ESTE navegador, no la que
+   esta publicada. Sin el, un iPad con una copia vieja en cache parece
+   un despliegue que no ha salido, y se busca el fallo donde no esta. */
+.sello { margin-top: 10px; color: var(--faint); opacity: .75; }
+.sello-viejo { display: inline-block; margin-top: 10px; padding: 7px 10px;
+  border: 1px solid var(--amber); border-radius: 3px;
+  color: var(--amber); opacity: 1; letter-spacing: .9px; }
 
 @media (max-width: 560px) {
   .shell { padding-left: 16px; padding-right: 16px; }
@@ -1241,11 +1248,12 @@ table.pipe td select.ck-est { background: var(--panel-2); border: 1px solid var(
   <footer class="foot">
     <div><b>ZRC OS</b> &middot; Capa 4 sobre Capa 3 &middot; datos en vivo desde Supabase</div>
     <div>Los permisos los aplica Postgres v&iacute;a RLS, no esta interfaz.</div>
+    <div id="sello" class="sello"></div>
   </footer>
 </div>
 
 <div class="loading" id="boot">CONECTANDO&hellip;</div>
 
-<script type="module" src="./app.js"></script>
+<script type="module" src="./app.js?v=2026-10-11a"></script>
 </body>
 </html>

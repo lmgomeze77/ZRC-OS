@@ -27,6 +27,24 @@ duplica nada, así que ante la duda, se repasan.
 | `16_actividad.sql` | sí | Registro de quién cambió qué y cuándo. Solo de agregar. |
 | `17_indice.sql` | sí | El índice de riesgo pasa a derivarse de las mesas del barrido. |
 | `18_sectorial.sql` | sí | Atractivo inversor por sector, con rúbricas ancladas. |
+| `21_mesas_reales.sql` | sí | Las nueve mesas del briefing y 49 días reconstruidos. |
+| `22_metodos.sql` | sí | Dos construcciones, dos series: índice de mesas y lectura. |
+
+### Ficheros «al día»
+
+Uniones de los anteriores, en orden, para una base que se quedó atrás. No
+añaden nada propio: son los mismos ficheros concatenados con una tabla de
+comprobación al final, porque el editor de Supabase sólo muestra la última
+consulta. Se aplica el más alto que haga falta y nada más.
+
+| Fichero | Une |
+|---|---|
+| `19_al_dia.sql` | 15 + 16 + 18 |
+| `20_al_dia_2.sql` | 14 + 17 |
+| `23_al_dia_3.sql` | 21 + 22 |
+
+`99_diagnostico.sql` es una sola consulta de lectura que dice, objeto por
+objeto, qué falta por aplicar. Ante la duda, se pasa ese primero.
 
 Los que no están en el repo contienen metodología propia o expedientes
 reales, y este repositorio es público.

@@ -21,6 +21,28 @@ const FIRMA_SEGS  = 60;
 const EXT_OK = ['pdf','doc','docx','xls','xlsx','ppt','pptx','csv','txt','rtf',
                 'png','jpg','jpeg','webp','heic'];
 
+// VERSION. La portada va con Cache-Control: no-store, asi que el ?v= del
+// <script> lo pone siempre el despliegue vivo. Si el fichero que acaba
+// ejecutandose no lleva esa misma version, el navegador ha servido una
+// copia vieja de su cache: eso, y no un despliegue parado, es lo que hace
+// que una actualizacion publicada no se vea. Hay que subir las dos a la
+// vez: esta constante y el ?v= de index.html.
+const VERSION = '2026-10-11a';
+const VERSION_PEDIDA = new URL(import.meta.url).searchParams.get('v');
+
+function sellaVersion() {
+  const el = $('sello');
+  if (!el) return;
+  if (VERSION_PEDIDA && VERSION_PEDIDA !== VERSION) {
+    el.className = 'sello-viejo';
+    el.innerHTML = `TU NAVEGADOR EJECUTA LA VERSI&Oacute;N ${esc(VERSION)} ·
+      EL SERVIDOR SIRVE LA ${esc(VERSION_PEDIDA)} · RECARGA FORZADA`;
+  } else {
+    el.className = 'sello';
+    el.textContent = 'VERSIÓN ' + VERSION;
+  }
+}
+
 const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 const $ = (id) => document.getElementById(id);
@@ -2488,6 +2510,7 @@ function wire() {
 
 // ── ARRANQUE ────────────────────────────────────────────────────────
 async function boot() {
+  sellaVersion();
   $('send').addEventListener('click', sendLink);
   $('email').addEventListener('keydown', e => { if (e.key === 'Enter') sendLink(); });
 

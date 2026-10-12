@@ -27,7 +27,7 @@ const EXT_OK = ['pdf','doc','docx','xls','xlsx','ppt','pptx','csv','txt','rtf',
 // copia vieja de su cache: eso, y no un despliegue parado, es lo que hace
 // que una actualizacion publicada no se vea. Hay que subir las dos a la
 // vez: esta constante y el ?v= de index.html.
-const VERSION = '2026-10-11e';
+const VERSION = '2026-10-12a';
 const VERSION_PEDIDA = new URL(import.meta.url).searchParams.get('v');
 
 function sellaVersion() {
@@ -54,7 +54,7 @@ const state = {
   rows: [], flags: [], pend: [], dims: [], bands: [],
   docs: [], econ: [], strat: [], outreach: [], mand: [], check: [], drError: null,
   ckPrio: '', ckEst: '',
-  codAbierto: null, codProp: null,
+  codAbierto: null, codProp: null, obsGraf: null,
   rubrics: [], gates: [], risk: [], doctError: null,
   outcomes: [], decisions: [], outError: null,
   miembros: [], accesos: [],
@@ -789,6 +789,215 @@ function anteriorDe(clave, hoy) {
     .sort((a, b) => b.fecha.localeCompare(a.fecha))[0] ?? null;
 }
 
+// ── LA GRAFICA DEL INDICE ───────────────────────────────────────────
+// Las bandas son las del propio briefing, tal cual estan escritas en su
+// generate-briefing.js: «0-30 benign · 31-50 normal · 51-70 elevated ·
+// 71-100 stressed». Sin ellas un 59 es un numero suelto y nadie sabe si
+// es mucho; con ellas se lee de un vistazo que estamos en elevado y a
+// cuanto queda del siguiente escalon.
+const BANDAS = [
+  { hi:  30, nombre: 'Benigno',    tinte: 'var(--green)' },
+  { hi:  50, nombre: 'Normal',     tinte: 'var(--cyan)'  },
+  { hi:  70, nombre: 'Elevado',    tinte: 'var(--amber)' },
+  { hi: 100, nombre: 'Tensionado', tinte: 'var(--red)'   }
+];
+const bandaDe = (v) => BANDAS.find(b => v <= b.hi) ?? BANDAS[BANDAS.length - 1];
+
+const MESES = ['ENE','FEB','MAR','ABR','MAY','JUN','JUL','AGO','SEP','OCT','NOV','DIC'];
+const dia = (f) => new Date(f + 'T00:00:00');
+const etiquetaDia = (f) => { const d = dia(f); return d.getDate() + ' ' + MESES[d.getMonth()]; };
+
+// La escala NO es 0..100: con la serie entre 36 y 78, pintar los cien
+// puntos la deja plana y no se ve evolucion ninguna. Se cine a los datos
+// con tres puntos de aire; redondear ademas los BORDES a decenas
+// regalaba hasta nueve puntos de alto para nada. Las decenas se quedan
+// donde importan, que es en las marcas.
+function escalaY(vals) {
+  const lo = Math.max(0,   Math.min(...vals) - 3);
+  const hi = Math.min(100, Math.max(...vals) + 3);
+  return hi - lo < 20 ? { lo: Math.max(0, Math.min(lo, hi - 20)), hi: Math.min(100, lo + 20) } : { lo, hi };
+}
+
+// Los tramos sin hueco. Antes la serie se RECORTABA por el ultimo hueco
+// y se perdian las semanas anteriores; ahora se dibujan todas y el hueco
+// se ve como lo que es: un trozo sin linea.
+function tramos(serie) {
+  const out = []; let act = [];
+  for (const r of serie) {
+    if (act.length && (dia(r.fecha) - dia(act[act.length - 1].fecha)) / 86400000 > 1) {
+      out.push(act); act = [];
+    }
+    act.push(r);
+  }
+  if (act.length) out.push(act);
+  return out;
+}
+
+function dibujaGrafica(cont) {
+  const serie = state.serie, cotejo = state.lecturasPub ?? [];
+  if (!cont || serie.length < 2) return;
+  const W = Math.max(260, Math.round(cont.clientWidth || 600));
+  const corto = W < 372;
+  const PL = 32, PR = corto ? 12 : 76, PT = 12, PB = 24;
+  const H = corto ? 148 : 204;
+  const pw = W - PL - PR, ph = H - PT - PB;
+
+  const t0 = dia(serie[0].fecha).getTime();
+  const t1 = dia(serie[serie.length - 1].fecha).getTime();
+  const cot = cotejo.filter(r => dia(r.fecha).getTime() >= t0 && dia(r.fecha).getTime() <= t1);
+  const { lo, hi } = escalaY(serie.map(r => r.valor).concat(cot.map(r => r.valor)));
+  const x = (f) => PL + (t1 === t0 ? pw / 2 : (dia(f).getTime() - t0) / (t1 - t0) * pw);
+  const y = (v) => PT + (hi - Math.min(hi, Math.max(lo, v))) / (hi - lo) * ph;
+  const r1 = (n) => Math.round(n * 10) / 10;
+  const linea = (rs) => rs.map((r, i) => (i ? 'L' : 'M') + r1(x(r.fecha)) + ' ' + r1(y(r.valor))).join(' ');
+
+  // ── fondo: una banda por tramo de riesgo que asome en la escala ──
+  let fondo = '', cortes = '', nombres = '';
+  let desde = lo;
+  for (const b of BANDAS) {
+    const a = Math.max(lo, desde), z = Math.min(hi, b.hi);
+    if (z > a) {
+      fondo += `<rect x="${PL}" y="${r1(y(z))}" width="${r1(pw)}" height="${r1(y(a) - y(z))}"
+        fill="${b.tinte}" opacity=".055"></rect>`;
+      if (!corto) nombres += `<text x="${W - PR + 9}" y="${r1((y(z) + y(a)) / 2)}" class="g-banda"
+        dominant-baseline="middle">${b.nombre.toUpperCase()}</text>`;
+    }
+    if (b.hi > lo && b.hi < hi) cortes += `<line x1="${PL}" x2="${r1(W - PR)}"
+      y1="${r1(y(b.hi))}" y2="${r1(y(b.hi))}" class="g-corte"></line>`;
+    desde = b.hi;
+  }
+
+  // ── rejilla y marcas: decenas, y meses en el eje de tiempo ──
+  let rejilla = '', marcasY = '';
+  for (let v = Math.ceil(lo / 10) * 10; v <= hi; v += 10) {
+    rejilla += `<line x1="${PL}" x2="${r1(W - PR)}"
+      y1="${r1(y(v))}" y2="${r1(y(v))}" class="g-rejilla"></line>`;
+    marcasY += `<text x="${PL - 7}" y="${r1(y(v))}" class="g-marca" text-anchor="end"
+      dominant-baseline="middle">${v}</text>`;
+  }
+  const hitos = [];
+  for (let i = 1; i < serie.length; i++) {
+    const d = dia(serie[i].fecha);
+    if (d.getMonth() !== dia(serie[i - 1].fecha).getMonth()) hitos.push(serie[i].fecha);
+  }
+  // Primera, ultima, y los cambios de mes que QUEPAN. En 320 px «1 OCT»
+  // y «10 OCT» se montaban una encima de otra; se descarta la de en
+  // medio antes que dejar dos rotulos solapados.
+  const SEP = 52;
+  const primera = serie[0].fecha, ultima = serie[serie.length - 1].fecha;
+  const puestas = [primera];
+  for (const f of hitos) {
+    if (f === primera || f === ultima) continue;
+    if (x(f) - x(puestas[puestas.length - 1]) >= SEP && x(ultima) - x(f) >= SEP) puestas.push(f);
+  }
+  if (ultima !== primera) puestas.push(ultima);
+  const marcasX = puestas.map((f, i, a) => {
+    const anchor = i === 0 ? 'start' : (i === a.length - 1 ? 'end' : 'middle');
+    return `<text x="${r1(x(f))}" y="${H - 7}" class="g-marca" text-anchor="${anchor}">${etiquetaDia(f)}</text>`;
+  }).join('');
+
+  const ult = serie[serie.length - 1];
+  const svg = `<svg viewBox="0 0 ${W} ${H}" width="100%" height="${H}" class="g-svg"
+    role="img" tabindex="0" aria-label="Índice de mesas y lectura del briefing, de ${
+      etiquetaDia(serie[0].fecha)} a ${etiquetaDia(ult.fecha)}, de ${lo} a ${hi}">
+    ${fondo}${rejilla}${cortes}${nombres}${marcasY}${marcasX}
+    <line x1="${PL}" x2="${PL}" y1="${PT}" y2="${PT + ph}" class="g-eje"></line>
+    <line x1="${PL}" x2="${r1(W - PR)}" y1="${PT + ph}" y2="${PT + ph}" class="g-eje"></line>
+    ${tramos(cot).filter(t => t.length > 1).map(t =>
+      `<path d="${linea(t)}" class="g-cotejo"></path>`).join('')}
+    ${tramos(serie).map(t => t.length > 1
+      ? `<path d="${linea(t)}" class="g-mesas"></path>`
+      : `<circle cx="${r1(x(t[0].fecha))}" cy="${r1(y(t[0].valor))}" r="2.2" fill="var(--acento)"></circle>`).join('')}
+    <circle cx="${r1(x(ult.fecha))}" cy="${r1(y(ult.valor))}" r="4.5" class="g-fin"></circle>
+    <g class="g-cruz">
+      <line y1="${PT}" y2="${PT + ph}" class="g-cruz-l"></line>
+      <circle r="4.5" class="g-cruz-a"></circle><circle r="4" class="g-cruz-b"></circle>
+    </g>
+    <rect x="${PL}" y="${PT}" width="${r1(pw)}" height="${r1(ph)}" fill="transparent" class="g-caza"></rect>
+  </svg>`;
+  cont.innerHTML = svg + '<div class="g-lee"></div>';
+  cablearCruz(cont, { serie, cot, x, y, PL, pw, W, PR });
+}
+
+// El cruce sigue al dedo y se engancha al dia mas cercano: se apunta a
+// una fecha, no a una linea de dos pixeles.
+//
+// Lo que se lee NO va en un globo flotante. El globo tapaba un tercio de
+// la grafica justo donde estabas mirando, y en un iPad lo tapa ademas el
+// propio dedo. Va en una linea fija debajo, que nace con el ultimo dia
+// puesto antes de que nadie toque nada. Y nada de esto es la unica via:
+// la tabla de abajo lo tiene todo sin pasar el dedo por encima.
+function cablearCruz(cont, g) {
+  const svg = cont.querySelector('.g-svg'), lee = cont.querySelector('.g-lee');
+  const cruz = cont.querySelector('.g-cruz');
+  const porFecha = new Map(g.cot.map(r => [r.fecha, r.valor]));
+  let i = g.serie.length - 1;
+
+  const pinta = (idx, conCruz = true) => {
+    i = Math.max(0, Math.min(g.serie.length - 1, idx));
+    const r = g.serie[i], lec = porFecha.get(r.fecha) ?? null;
+    const px = g.x(r.fecha);
+    // Por clase y no por .hidden: en SVG esa propiedad no existe, asi
+    // que la cruz se quedaba invisible mientras el texto si cambiaba.
+    cruz.classList.toggle('es-on', conCruz);
+    cruz.querySelector('.g-cruz-l').setAttribute('x1', px);
+    cruz.querySelector('.g-cruz-l').setAttribute('x2', px);
+    const a = cruz.querySelector('.g-cruz-a');
+    a.setAttribute('cx', px); a.setAttribute('cy', g.y(r.valor));
+    const b = cruz.querySelector('.g-cruz-b');
+    b.setAttribute('cx', px); b.setAttribute('cy', lec == null ? -99 : g.y(lec));
+    b.classList.toggle('es-off', lec == null);
+
+    const brecha = lec == null ? null : r.valor - lec;
+    lee.innerHTML = `<span class="g-lee-f">${esc(etiquetaDia(r.fecha))}</span>
+      <span class="g-lee-r"><i class="k-mesas"></i><b>${r.valor}</b> mesas${
+        r.cobertura != null && r.cobertura < 100 ? ` <span>${r.cobertura}%</span>` : ''}</span>
+      ${lec == null ? '<span class="g-lee-r g-lee-no">sin lectura del briefing</span>'
+        : `<span class="g-lee-r"><i class="k-cotejo"></i><b>${lec}</b> briefing</span>
+           <span class="g-lee-b">${brecha > 0 ? '+' : ''}${brecha} de brecha</span>`}
+      <span class="g-lee-banda" style="--chip:${bandaDe(r.valor).tinte}">${
+        esc(bandaDe(r.valor).nombre.toUpperCase())}</span>`;
+  };
+  const cerrar = () => pinta(g.serie.length - 1, false);
+  const porPunto = (ev) => {
+    const caja = svg.getBoundingClientRect();
+    const px = (ev.clientX - caja.left) / caja.width * g.W;
+    let mejor = 0, dist = Infinity;
+    g.serie.forEach((r, k) => { const d = Math.abs(g.x(r.fecha) - px); if (d < dist) { dist = d; mejor = k; } });
+    pinta(mejor);
+  };
+  svg.addEventListener('pointermove', porPunto);
+  svg.addEventListener('pointerdown', porPunto);
+  svg.addEventListener('pointerleave', cerrar);
+  svg.addEventListener('blur', cerrar);
+  svg.addEventListener('focus', () => pinta(i));
+  pinta(g.serie.length - 1, false);   // la linea nace con el ultimo dia puesto
+  svg.addEventListener('keydown', (ev) => {
+    if (ev.key === 'ArrowLeft')  { ev.preventDefault(); pinta(i - 1); }
+    if (ev.key === 'ArrowRight') { ev.preventDefault(); pinta(i + 1); }
+    if (ev.key === 'Escape') { cerrar(); svg.blur(); }
+  });
+}
+
+// La tabla es el gemelo accesible de la grafica: todo lo que ensena el
+// globo esta aqui sin pasar el dedo por encima, y se puede copiar.
+function tablaSerie() {
+  const cot = new Map((state.lecturasPub ?? []).map(r => [r.fecha, r.valor]));
+  const filas = [...state.serie].reverse().map(r => {
+    const l = cot.get(r.fecha);
+    return `<tr><td>${esc(r.fecha)}</td><td class="num">${r.valor}</td>
+      <td class="num">${l ?? '—'}</td>
+      <td class="num">${l == null ? '—' : (r.valor - l > 0 ? '+' : '') + (r.valor - l)}</td>
+      <td>${esc(bandaDe(r.valor).nombre)}</td>
+      <td class="num">${r.cobertura == null ? '—' : r.cobertura + '%'}</td></tr>`;
+  }).join('');
+  return `<details class="g-tabla"><summary>ver la serie en tabla · ${state.serie.length} días</summary>
+    <div class="g-tabla-caja"><table>
+      <thead><tr><th>Fecha</th><th class="num">Mesas</th><th class="num">Briefing</th>
+        <th class="num">Brecha</th><th>Banda</th><th class="num">Cobertura</th></tr></thead>
+      <tbody>${filas}</tbody></table></div></details>`;
+}
+
 function bloqueIndice() {
   if (state.mercError) {
     return `<div class="card"><div class="merc-tit">Índice de mesas · ZRC</div>
@@ -796,13 +1005,15 @@ function bloqueIndice() {
         'Hasta que se aplique, el índice sigue siendo un número suelto que nadie puede reproducir ni rellenar a medias.')}</div>`;
   }
   const e = state.riesgo;
-  const { tramo, corte } = tramoContinuo(state.serie);
+  const { corte } = tramoContinuo(state.serie);
   const hoy = new Date().toISOString().slice(0, 10);
   const leidoHoy = new Map(state.lecturas.filter(l => l.fecha === hoy).map(l => [l.mesa, l]));
 
   const cabecera = !e ? '<div class="vacio">Sin ninguna lectura todavía.</div>' : `
     <div class="merc-num">
       <span class="merc-val">${e.valor}</span>
+      <span class="g-chip" data-banda="${esc(bandaDe(e.valor).nombre)}"
+        style="--chip:${bandaDe(e.valor).tinte}">${esc(bandaDe(e.valor).nombre.toUpperCase())}</span>
       <span class="merc-delta">${e.delta == null ? '' :
         (e.delta === 0 ? '→ 0' : (e.delta > 0 ? '▲ ' : '▼ ') + Math.abs(e.delta))}
         · ${esc(e.estado)}${e.cobertura != null ? ` · ${e.cobertura}% de cobertura` : ''}</span>
@@ -812,13 +1023,15 @@ function bloqueIndice() {
       El briefing publicó <b>${e.lectura}</b> ese día${e.brecha != null
         ? ` · <span class="merc-brecha">${e.brecha > 0 ? '+' : ''}${e.brecha}</span> de brecha` : ''}.
       Lo propone la IA leyendo los titulares, así que no se reproduce desde las mesas.</div>` : ''}
-    ${tramo.length > 1 ? `<div class="spark-wrap">${sparkline(tramo, state.lecturasPub)}</div>
+    ${state.serie.length > 1 ? `<div class="g-caja" id="grafIndice"></div>
       <div class="spark-legend">
-        <span><i style="background:var(--acento)"></i>Índice de mesas</span>
+        <span><i class="i-solido"></i>Índice de mesas</span>
         <span><i class="i-trazo"></i>Lectura del briefing</span>
-      </div>` : ''}
+        <span class="g-leyenda-nota">la escala son las bandas del briefing</span>
+      </div>
+      ${tablaSerie()}` : ''}
     ${corte ? `<div class="merc-corte">SERIE CORTADA · ${corte.dias} días sin lectura tras el ${esc(corte.desde)}.
-       No se dibuja el hueco porque no se midió.</div>` : ''}
+       El hueco se ve en la gráfica porque no se midió: la línea no lo cruza.</div>` : ''}
     ${e.caducado ? `<p class="merc-caduco"><b>El índice de mesas está caducado.</b>
        Lleva ${e.dias_sin_actualizar} días sin actualizar, así que describe el riesgo de entonces,
        no el de hoy. El barrido de mesas es lo que lo reactiva.</p>` : ''}`;
@@ -1030,6 +1243,21 @@ function renderMercado() {
   $('mercIndice').innerHTML = bloqueIndice();
   $('mercSector').innerHTML = bloqueSectorial();
   cablearMercado();
+  // La grafica se dibuja DESPUES de pintar, porque necesita saber el
+  // ancho real: con un viewBox fijo estirado al contenedor los trazos
+  // salen deformados y las marcas, de tamanos distintos segun la
+  // pantalla. Un solo observador, que se reengancha en cada pintada.
+  const caja = $('grafIndice');
+  if (caja) {
+    dibujaGrafica(caja);
+    state.obsGraf?.disconnect();
+    let ancho = caja.clientWidth;
+    state.obsGraf = new ResizeObserver(() => {
+      if (Math.abs(caja.clientWidth - ancho) < 8) return;
+      ancho = caja.clientWidth; dibujaGrafica(caja);
+    });
+    state.obsGraf.observe(caja);
+  }
 }
 
 async function lanzarIngesta(manual) {

@@ -27,7 +27,7 @@ const EXT_OK = ['pdf','doc','docx','xls','xlsx','ppt','pptx','csv','txt','rtf',
 // copia vieja de su cache: eso, y no un despliegue parado, es lo que hace
 // que una actualizacion publicada no se vea. Hay que subir las dos a la
 // vez: esta constante y el ?v= de index.html.
-const VERSION = '2026-10-12a';
+const VERSION = '2026-10-14a';
 const VERSION_PEDIDA = new URL(import.meta.url).searchParams.get('v');
 
 function sellaVersion() {
@@ -297,17 +297,30 @@ function renderStats() {
   const sinCodigo = state.pend.filter(p => p.motivo === 'sin_codigo').length;
   const vivos = state.mand.filter(m => m.estado === 'vivo').length;
 
-  const tile = (label, value, sub, alert) =>
-    `<div class="stat${alert ? ' is-alert' : ''}"><div class="stat-label">${label}</div>
-     <div class="stat-value">${value}</div><div class="stat-sub">${sub}</div></div>`;
+  // `nivel` es '' | 'alerta' | 'stop'. El color no viaja solo: cada
+  // tarjeta marcada lleva ademas su palabra, porque un ambar y un rojo a
+  // 8 px de distancia no los separa todo el mundo.
+  const tile = (label, value, sub, nivel = '') => {
+    const clase = nivel === 'stop' ? ' is-stop' : nivel === 'alerta' ? ' is-alert' : '';
+    const aviso = nivel === 'stop' ? 'BLOQUEA' : nivel === 'alerta' ? 'PENDIENTE' : '';
+    return `<div class="stat${clase}">
+      <div class="stat-head"><div class="stat-label">${label}</div>${
+        aviso ? `<span class="stat-aviso">${aviso}</span>` : ''}</div>
+      <div class="stat-value">${value}</div><div class="stat-sub">${sub}</div></div>`;
+  };
 
   $('statGrid').innerHTML =
     tile('Expedientes en pipeline', n, `<b>${puntuados}</b> puntuados · <b>${n - puntuados}</b> sin puntuar`) +
     tile('En banda P1–P2', `${p12}<small>/ ${n}</small>`, 'Acción en 48 h y 7 días') +
     tile('Mandatos vivos', vivos || '—',
-         vivos ? 'Con plazo y economics registrados' : 'Ningún mandato vivo en Capa 3', !vivos) +
-    tile('Verificación previa', previa, 'Ámbito o sanciones antes de analizar', previa > 0) +
-    tile('Sin código de expediente', `${sinCodigo}<small>/ ${n}</small>`, 'Bloquea el registro formal (§12.3)', sinCodigo > 0) +
+         vivos ? 'Con plazo y economics registrados' : 'Ningún mandato vivo en Capa 3',
+         vivos ? '' : 'alerta') +
+    // Sanciones y ambito paran el proceso: en la cola esto sale con el
+    // simbolo de stop, y aqui tiene que decir lo mismo.
+    tile('Verificación previa', previa, 'Ámbito o sanciones antes de analizar',
+         previa > 0 ? 'stop' : '') +
+    tile('Sin código de expediente', `${sinCodigo}<small>/ ${n}</small>`,
+         'Bloquea el registro formal (§12.3)', sinCodigo > 0 ? 'alerta' : '') +
     tarjetaRiesgo();
 }
 
@@ -362,18 +375,20 @@ function tarjetaRiesgo() {
   const delta = prev ? ult.valor - prev.valor : 0;
   const flecha = delta === 0 ? '→' : (delta > 0 ? '▲' : '▼');
   const dias = Math.round((Date.now() - new Date(ult.fecha).getTime()) / 86400000);
-  // El mismo nombre que la tarjeta grande: las dos pintan la serie de
-  // MESAS, y llamarla aqui «de riesgo» la confundia con la lectura del
-  // briefing, que es el otro numero y no es este.
-  return `<div class="stat"><div class="stat-label">Índice de mesas · ZRC</div>
+  const b = bandaDe(ult.valor);
+  // Catorce dias, no cincuenta y uno. Una chispa de tarjeta dice «por
+  // donde va»; la serie entera con su escala esta en Mercado, y meterla
+  // dos veces no la contaba mejor: solo hacia esta tarjeta mas alta que
+  // sus vecinas y abria un hueco en la rejilla.
+  const corto = tramoContinuo(serie).tramo.slice(-14);
+  return `<div class="stat">
+    <div class="stat-head"><div class="stat-label">Índice de mesas · ZRC</div>
+      <span class="g-chip" style="--chip:${b.tinte}">${esc(b.nombre.toUpperCase())}</span></div>
     <div class="stat-value">${ult.valor}<small>${flecha} ${Math.abs(delta)}</small></div>
-    <div class="spark-wrap">${sparkline(tramoContinuo(serie).tramo)}</div>
-    <div class="spark-legend">
-      <span><i style="background:var(--acento)"></i>Publicado</span>
-      <span><i style="border:1.2px solid var(--amber)"></i>Degradado</span>
-      <span><i style="border:1.2px solid var(--faint)"></i>Reconstruido</span>
-    </div>
-    <div class="stat-sub">${esc(ult.fecha)}${dias > 2 ? ` · <b style="color:var(--amber)">${dias} días sin actualizar</b>` : ''}</div></div>`;
+    ${corto.length > 1 ? `<div class="spark-wrap">${sparkline(corto)}</div>` : ''}
+    <div class="stat-sub">${dias > 2
+      ? `<b style="color:var(--amber)">${dias} días sin actualizar</b>`
+      : `${esc(ult.fecha)} · ${corto.length} últimos días`}</div></div>`;
 }
 
 // ── ALTA DE EXPEDIENTE ──────────────────────────────────────────────
@@ -1101,8 +1116,15 @@ function panelMesas() {
   if (!state.mesas.length) return '';
   const editable = canWrite();
   const act = state.mesas.filter(m => m.activa).length;
+  // Las activas primero. Las nueve que invente yo estan retiradas pero
+  // siguen en la tabla, y entreveradas con las de verdad obligaban a ir
+  // leyendo casilla por casilla cual es cual.
+  const mesas = [...state.mesas].sort((x, y) =>
+    (y.activa === true) - (x.activa === true) ||
+    (x.orden ?? 99) - (y.orden ?? 99) ||
+    String(x.clave).localeCompare(String(y.clave)));
   const fila = (m) => editable ? `
-    <tr data-mesaid="${esc(m.clave)}">
+    <tr data-mesaid="${esc(m.clave)}" class="${m.activa ? '' : 'es-retirada'}">
       <td class="mesa-clave">${esc(m.clave)}</td>
       <td><input type="text" class="mc-nom" value="${esc(m.nombre)}" maxlength="80" /></td>
       <td><input type="text" class="mc-desc" value="${esc(m.descripcion ?? '')}" maxlength="200"
@@ -1111,7 +1133,7 @@ function panelMesas() {
       <td class="num"><input type="checkbox" class="mc-act" ${m.activa ? 'checked' : ''}
             aria-label="${esc(m.nombre)} activa" /></td>
     </tr>` : `
-    <tr><td class="mesa-clave">${esc(m.clave)}</td><td>${esc(m.nombre)}</td>
+    <tr class="${m.activa ? '' : 'es-retirada'}"><td class="mesa-clave">${esc(m.clave)}</td><td>${esc(m.nombre)}</td>
       <td class="mesa-desc">${esc(m.descripcion ?? '')}</td>
       <td class="num">${m.peso}</td><td class="num">${m.activa ? 'sí' : 'no'}</td></tr>`;
 
@@ -1130,10 +1152,10 @@ function panelMesas() {
       <b>no reescribe el pasado</b>: sus lecturas siguen contando en sus días.
     </p>
     <div class="table-scroll"><table class="sec-tabla mesas-tabla">
-      <colgroup><col class="c-clave" /><col /><col /><col class="c-peso" /><col class="c-act" /></colgroup>
+      <colgroup><col class="c-clave" /><col class="c-nom" /><col /><col class="c-peso" /><col class="c-act" /></colgroup>
       <thead><tr><th>Clave</th><th>Nombre</th><th>Qué mira</th>
         <th class="num">Peso</th><th class="num">Activa</th></tr></thead>
-      <tbody>${state.mesas.map(fila).join('')}</tbody>
+      <tbody>${mesas.map(fila).join('')}</tbody>
     </table></div>
     ${editable ? `
       <div class="mesas-alta">

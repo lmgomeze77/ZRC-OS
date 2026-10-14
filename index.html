@@ -71,6 +71,11 @@
      son el mismo numero por dos caminos, no dos magnitudes distintas.
      3,48:1 sobre blanco, asi que aguanta sola como trazo. */
   --acento-2: #5E8DBE;
+  /* Grafito: el gris oscuro del logotipo y de las cifras neutras.
+     --cream (#0F1C2E) es practicamente negro -- 17:1 sobre el panel --
+     y en una pagina de cifras el negro pleno pesa mas de lo que dice.
+     Este da 11:1, que sigue siendo holgado, y se lee como gris. */
+  --grafito: #333D4A;
   --wash: rgba(15,28,46,.035);
 
   --mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -135,7 +140,7 @@ button { background: none; border: none; cursor: pointer; }
 @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .4; } }
 
 .wordmark {
-  color: var(--cream); font-family: var(--display); font-weight: 600;
+  color: var(--grafito); font-family: var(--display); font-weight: 600;
   font-size: clamp(34px, 7vw, 46px); line-height: 1; letter-spacing: -.5px;
   margin: 10px 0 6px;
 }
@@ -195,12 +200,31 @@ button { background: none; border: none; cursor: pointer; }
 }
 .sec-ref { color: var(--faint); font-family: var(--mono); font-size: 9px; letter-spacing: 1px; margin-left: auto; }
 
+/* Seis tarjetas. A 248 px de minimo caben tres en un iPad apaisado, dos
+   en vertical y una en el movil: 6 se parte en 1, 2 y 3 sin dejar nunca
+   una huerfana. Con el minimo en 300 salian dos columnas y la tarjeta
+   del indice, mas alta que las demas, abria un hueco en su fila. */
+/* Columnas contadas a mano, no auto-fit: seis tarjetas se parten limpias
+   en 1, 2 y 3, pero auto-fit llegaba a cuatro en pantalla ancha y dejaba
+   la segunda fila con dos tarjetas y dos huecos. */
 .stat-grid {
   display: grid; gap: 1px; background: var(--panel);
   border: 1px solid var(--line-2);
-  
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  grid-template-columns: 1fr;
 }
+@media (min-width: 620px)  { .stat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (min-width: 820px)  { .stat-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+/* La chispa de la tarjeta es un indicador, no la grafica: 26 px y pegada
+   al numero, para que esta tarjeta mida lo mismo que sus vecinas. La
+   serie con su escala, sus bandas y sus dos lineas esta en Mercado. */
+.stat .spark-wrap { margin-top: 7px; }
+.stat .spark-wrap svg { height: 26px; }
+/* La banda y el aviso dicen cosas distintas -- una es el estado del
+   mundo, el otro es trabajo que te toca -- asi que no pueden llevar la
+   misma caja. El aviso conserva el recuadro; la banda se queda en la
+   palabra con su punto delante. */
+.stat .g-chip { margin-left: auto; border: none; background: none; padding: 0; }
+.stat .g-chip::before { content: '\25cf\00a0 '; }
 .stat { background: var(--panel); padding: 16px 17px 15px;
   outline: 1px solid var(--line-2); }
 .stat-label {
@@ -208,14 +232,28 @@ button { background: none; border: none; cursor: pointer; }
   color: var(--muted); text-transform: uppercase; margin-bottom: 9px;
 }
 .stat-value {
-  color: var(--cream); font-family: var(--display);
+  color: var(--grafito); font-family: var(--display);
   font-size: 34px; font-weight: 600; line-height: 1;
   font-variant-numeric: tabular-nums;
 }
 .stat-value small { font-size: 15px; color: var(--muted); font-weight: 400; margin-left: 3px; }
 .stat-sub { font-family: var(--mono); font-size: 9.5px; color: var(--muted); margin-top: 8px; letter-spacing: .3px; }
 .stat-sub b { color: var(--text); font-weight: 500; }
+/* Dos niveles, no uno. Antes todo lo que pedia atencion salia en ambar:
+   un mandato que falta, doce expedientes sin codificar y un expediente
+   bloqueado por sanciones pintaban igual, y no son lo mismo. El ambar se
+   queda en «hay trabajo acumulado»; el rojo, en «esto para el proceso»,
+   que es como la pagina ya marca la verificacion previa en la cola.
+   Y el color no va solo: cada tarjeta marcada lleva su palabra. */
 .stat.is-alert .stat-value { color: var(--amber); }
+.stat.is-stop  .stat-value { color: var(--red); }
+.stat-head { display: flex; align-items: baseline; gap: 8px; }
+.stat-head .stat-label { margin-bottom: 0; }
+.stat-aviso { margin-left: auto; font-family: var(--mono); font-size: 7.5px;
+  font-weight: 700; letter-spacing: 1.1px; padding: 2px 5px; border-radius: 2px;
+  white-space: nowrap; }
+.stat.is-alert .stat-aviso { color: var(--amber); border: 1px solid var(--amber); }
+.stat.is-stop  .stat-aviso { color: var(--red);   border: 1px solid var(--red); }
 
 .spark-wrap { margin-top: 9px; }
 .spark-legend {
@@ -1036,14 +1074,25 @@ table.pipe td select.ck-est { background: var(--panel-2); border: 1px solid var(
 .mesas-cfg summary::before { content: '▸ '; }
 .mesas-cfg[open] summary::before { content: '▾ '; }
 .mesas-cfg summary:hover { color: var(--acento-hi); }
-.mesas-tabla { table-layout: fixed; }
 /* Anchos fijos: sin ellos el nombre se quedaba en un tercio de lo que
-   necesita y las cabeceras de peso y activa se pegaban la una a la
-   otra. */
-.mesas-tabla col.c-clave { width: 48px; }
+   necesita y las cabeceras de peso y activa se pegaban la una a la otra.
+   La clave pasa de 48 a 118 px porque las de verdad son `critical-minerals`
+   y `emerging-markets`, que en 48 se partian en dos lineas y descuadraban
+   la fila entera. Y la tabla gana un minimo propio: antes que apretar las
+   cinco columnas en 300 px, que la caja se desplace. */
+.mesas-tabla { table-layout: fixed; min-width: 620px; }
+.mesas-tabla col.c-clave { width: 136px; }
+.mesas-tabla col.c-nom   { width: 32%; }
 .mesas-tabla col.c-peso  { width: 72px; }
 .mesas-tabla col.c-act   { width: 62px; }
 .mesas-tabla td { vertical-align: middle; padding: 7px 10px 7px 0; }
+.mesas-tabla td:first-child { padding-left: 10px; }
+/* Una mesa retirada sigue en la tabla -- sus lecturas cuentan en sus
+   dias -- pero no compite por la mirada con las que estan en el indice. */
+.mesas-tabla tr.es-retirada { background: var(--wash); }
+.mesas-tabla tr.es-retirada .mesa-clave { color: var(--faint); }
+.mesas-tabla tr.es-retirada input[type=text],
+.mesas-tabla tr.es-retirada input[type=number] { color: var(--faint); background: transparent; }
 .mesas-tabla th.num, .mesas-tabla td.num { padding-right: 8px; }
 .mesas-tabla input[type=text], .mesas-tabla input[type=number] {
   width: 100%; background: var(--panel-2); border: 1px solid var(--line); border-radius: 2px;
@@ -1051,7 +1100,8 @@ table.pipe td select.ck-est { background: var(--panel-2); border: 1px solid var(
 .mesas-tabla input:focus { outline: none; border-color: var(--acento-line); }
 .mesas-tabla input[type=number] { width: 68px; text-align: right; font-family: var(--mono); }
 .mesas-tabla input[type=checkbox] { width: 16px; height: 16px; accent-color: var(--acento); }
-.mesa-clave { font-family: var(--mono); font-size: 10px; font-weight: 700; color: var(--acento); }
+.mesa-clave { font-family: var(--mono); font-size: 10px; font-weight: 700;
+  color: var(--acento); line-height: 1.35; word-break: normal; overflow-wrap: anywhere; }
 .mesa-desc { color: var(--muted); font-size: 12px; }
 .mesas-alta { display: flex; gap: 10px; align-items: center; margin-top: 14px; flex-wrap: wrap; }
 .mesas-alta input { flex: 1; min-width: 200px; background: var(--panel-2);
@@ -1409,6 +1459,6 @@ table.pipe td select.ck-est { background: var(--panel-2); border: 1px solid var(
 
 <div class="loading" id="boot">CONECTANDO&hellip;</div>
 
-<script type="module" src="./app.js?v=2026-10-12a"></script>
+<script type="module" src="./app.js?v=2026-10-14a"></script>
 </body>
 </html>

@@ -78,6 +78,26 @@
   --grafito: #333D4A;
   --wash: rgba(15,28,46,.035);
 
+  /* ── DEL DOSSIER ──────────────────────────────────────────────
+     El dossier de Espronceda trabaja en tres planos: el tinte de
+     fuera, la hoja y el panel redondeado. ZRC OS solo tenia dos, y
+     por eso las secciones flotaban sueltas sobre el fondo. El navy
+     es el de sus bloques oscuros; el filete naranja, el de sus
+     cargas registrales -- decorativo, 2,6:1 sobre blanco, asi que
+     nunca lleva texto encima. */
+  --tinte:   #D3DCE7;
+  --hoja:    #F7F9FC;
+  --panel-az:#E1E9F3;
+  --card:    rgba(255,255,255,.78);
+  --navy:    #0B2545;
+  --navy-lab:#A9C2DF;
+  --naranja: #E07A2F;
+  --sky:     #6FB0E6;
+  /* Sobre el navy el ambar da 3,06:1 y el rojo 2,38: ilegibles. Los
+     avisos de las tarjetas oscuras usan estos, 8,7:1 y 7,6:1. */
+  --sobre-navy-alerta: #FFB36B;
+  --sobre-navy-stop:   #FF9B9B;
+
   --mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
   /* Caladea es el sustituto metrico de Cambria: misma anchura y mismo
      color de pagina, asi que en Windows la cascada a Cambria no mueve
@@ -91,9 +111,7 @@
 html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
 
 body {
-  background:
-    radial-gradient(circle at 50% -8%, rgba(31,92,158,.06), transparent 38%),
-    var(--bg);
+  background: var(--tinte);
   color: var(--text);
   font-family: var(--body);
   font-size: 15px;
@@ -110,7 +128,11 @@ button { background: none; border: none; cursor: pointer; }
 ::-webkit-scrollbar-track { background: var(--bg); }
 ::-webkit-scrollbar-thumb { background: rgba(31,92,158,.28); border-radius: 4px; }
 
-.shell { max-width: 1120px; margin: 0 auto; padding-left: 24px; padding-right: 24px; }
+/* La hoja: el plano de en medio. Antes el contenido iba directo sobre
+   el fondo y cada seccion flotaba sola; ahora hay un soporte debajo,
+   como en el dossier. */
+.shell { max-width: 1120px; margin: 0 auto; padding-left: 24px; padding-right: 24px;
+  background: var(--hoja); }
 /* En pantalla de trabajo el ancho de lectura deja de mandar: manda el area
    de trabajo. Con 1120px el panel del expediente se quedaba en 724 y los
    paneles de gobierno no entraban en paralelo. El texto corrido sigue
@@ -148,7 +170,7 @@ button { background: none; border: none; cursor: pointer; }
 .tagline { color: var(--muted); font-size: 13px; max-width: 54ch; }
 
 .stamp { text-align: right; flex-shrink: 0; }
-.stamp-date { color: var(--cream); font-family: var(--display); font-size: 16px; }
+.stamp-date { color: var(--navy); font-family: var(--display); font-size: 16px; }
 .stamp-meta { color: var(--muted); font-family: var(--mono); font-size: 10px; letter-spacing: .5px; margin-top: 3px; }
 
 .nav {
@@ -176,29 +198,47 @@ button { background: none; border: none; cursor: pointer; }
   background: var(--acento-soft); padding: 1px 5px; border-radius: 2px;
 }
 
-.section { box-shadow: none; }
+/* Cada seccion es un panel redondeado sobre la hoja, con el brillo
+   radial del dossier cayendo desde la esquina superior derecha. */
+.section {
+  position: relative; background: var(--panel-az); border-radius: 28px;
+  padding: 30px 28px 32px; margin-bottom: 20px; overflow: visible;
+  box-shadow: none;
+}
+.section::before {
+  content: ''; position: absolute; inset: 0; pointer-events: none; border-radius: 28px;
+  background: radial-gradient(110% 75% at 100% 0%, rgba(255,255,255,.55), rgba(255,255,255,0) 60%);
+}
+.section > * { position: relative; }
 .stat, .q-item, .detail, #drPane, .hoy-lista, .table-scroll, .card, .layer, .frm {
-  box-shadow: 0 1px 2px rgba(15,28,46,.05), 0 1px 1px rgba(15,28,46,.04); }
-.section { padding-block: 44px 0; }
+  box-shadow: 0 1px 0 rgba(11,37,69,.03); }
 /* La cabecera de seccion cierra con una regla de 2 px y un filete de oro
    de 54 px encima. El filete es lo que convierte un titulo en el
    principio de algo: sin el, cinco secciones seguidas se leen como una
    lista larga. Va en ::after y no en un elemento, para no tocar el HTML. */
+/* La pestana. En el dossier va pegada al borde izquierdo del panel y
+   se desvanece hacia la derecha; aqui hace lo mismo, saliendose del
+   acolchado de la seccion con un margen negativo. El filete de acento
+   de antes era lo que convertia un titulo en el principio de algo: eso
+   ahora lo hace la propia pestana. */
 .sec-head {
   position: relative;
-  display: flex; align-items: baseline; gap: 14px;
-  border-bottom: 2px solid var(--linea-fuerte); padding-bottom: 12px; margin-bottom: 22px;
-  flex-wrap: wrap;
-}
-.sec-head::after {
-  content: ''; position: absolute; left: 0; bottom: -2px;
-  width: 54px; height: 2px; background: var(--acento);
+  display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap;
+  margin: -6px -28px 22px -28px; padding: 13px 44px 14px 28px;
+  align-self: flex-start;
+  background: linear-gradient(90deg, rgba(255,255,255,.96) 0%,
+                                     rgba(255,255,255,.70) 55%,
+                                     rgba(255,255,255,.12) 100%);
+  border: 1px solid rgba(255,255,255,.95); border-left: 0;
+  border-radius: 0 26px 26px 0;
+  box-shadow: 0 8px 24px rgba(11,37,69,.05);
 }
 .sec-title {
-  color: var(--cream); font-family: var(--display);
-  font-size: 27px; font-weight: 600; letter-spacing: -.3px; line-height: 1.15;
+  color: var(--navy); font-family: var(--display);
+  font-size: 28px; font-weight: 600; letter-spacing: -.4px; line-height: 1.15;
 }
-.sec-ref { color: var(--faint); font-family: var(--mono); font-size: 9px; letter-spacing: 1px; margin-left: auto; }
+.sec-ref { color: var(--muted); font-family: var(--mono); font-size: 9px;
+  letter-spacing: 1px; margin-left: auto; }
 
 /* Seis tarjetas. A 248 px de minimo caben tres en un iPad apaisado, dos
    en vertical y una en el movil: 6 se parte en 1, 2 y 3 sin dejar nunca
@@ -208,8 +248,7 @@ button { background: none; border: none; cursor: pointer; }
    en 1, 2 y 3, pero auto-fit llegaba a cuatro en pantalla ancha y dejaba
    la segunda fila con dos tarjetas y dos huecos. */
 .stat-grid {
-  display: grid; gap: 1px; background: var(--panel);
-  border: 1px solid var(--line-2);
+  display: grid; gap: 12px; background: none; border: none;
   grid-template-columns: 1fr;
 }
 @media (min-width: 620px)  { .stat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
@@ -219,41 +258,48 @@ button { background: none; border: none; cursor: pointer; }
    serie con su escala, sus bandas y sus dos lineas esta en Mercado. */
 .stat .spark-wrap { margin-top: 7px; }
 .stat .spark-wrap svg { height: 26px; }
+/* Sobre navy, el azul del trazo desaparece: la chispa de la tarjeta
+   oscura se dibuja en el celeste del dossier. */
+.stat .spark-wrap path[stroke] { stroke: var(--sky); }
+.stat .spark-wrap path[fill^='url'] { opacity: .3; }
+.stat .spark-wrap circle { fill: var(--sky); stroke: var(--navy); }
 /* La banda y el aviso dicen cosas distintas -- una es el estado del
    mundo, el otro es trabajo que te toca -- asi que no pueden llevar la
    misma caja. El aviso conserva el recuadro; la banda se queda en la
    palabra con su punto delante. */
 .stat .g-chip { margin-left: auto; border: none; background: none; padding: 0; }
 .stat .g-chip::before { content: '\25cf\00a0 '; }
-.stat { background: var(--panel); padding: 16px 17px 15px;
-  outline: 1px solid var(--line-2); }
+/* Los bloques de cifras del dossier (.kpi4): navy, redondeados y con
+   el numero en peso ligero. Es lo que mas se reconoce de su lenguaje. */
+.stat { background: var(--navy); border-radius: 22px; padding: 18px 22px 17px;
+  outline: none; }
 .stat-label {
   font-family: var(--mono); font-size: 8.5px; letter-spacing: 1.3px;
-  color: var(--muted); text-transform: uppercase; margin-bottom: 9px;
+  color: var(--navy-lab); text-transform: uppercase; margin-bottom: 9px;
 }
 .stat-value {
-  color: var(--grafito); font-family: var(--display);
+  color: #fff; font-family: var(--display);
   font-size: 34px; font-weight: 600; line-height: 1;
   font-variant-numeric: tabular-nums;
 }
-.stat-value small { font-size: 15px; color: var(--muted); font-weight: 400; margin-left: 3px; }
-.stat-sub { font-family: var(--mono); font-size: 9.5px; color: var(--muted); margin-top: 8px; letter-spacing: .3px; }
-.stat-sub b { color: var(--text); font-weight: 500; }
+.stat-value small { font-size: 15px; color: var(--navy-lab); font-weight: 400; margin-left: 3px; }
+.stat-sub { font-family: var(--mono); font-size: 9.5px; color: var(--navy-lab); margin-top: 8px; letter-spacing: .3px; }
+.stat-sub b { color: #fff; font-weight: 500; }
 /* Dos niveles, no uno. Antes todo lo que pedia atencion salia en ambar:
    un mandato que falta, doce expedientes sin codificar y un expediente
    bloqueado por sanciones pintaban igual, y no son lo mismo. El ambar se
    queda en «hay trabajo acumulado»; el rojo, en «esto para el proceso»,
    que es como la pagina ya marca la verificacion previa en la cola.
    Y el color no va solo: cada tarjeta marcada lleva su palabra. */
-.stat.is-alert .stat-value { color: var(--amber); }
-.stat.is-stop  .stat-value { color: var(--red); }
+.stat.is-alert .stat-value { color: var(--sobre-navy-alerta); }
+.stat.is-stop  .stat-value { color: var(--sobre-navy-stop); }
 .stat-head { display: flex; align-items: baseline; gap: 8px; }
 .stat-head .stat-label { margin-bottom: 0; }
 .stat-aviso { margin-left: auto; font-family: var(--mono); font-size: 7.5px;
   font-weight: 700; letter-spacing: 1.1px; padding: 2px 5px; border-radius: 2px;
   white-space: nowrap; }
-.stat.is-alert .stat-aviso { color: var(--amber); border: 1px solid var(--amber); }
-.stat.is-stop  .stat-aviso { color: var(--red);   border: 1px solid var(--red); }
+.stat.is-alert .stat-aviso { color: var(--sobre-navy-alerta); border: 1px solid var(--sobre-navy-alerta); }
+.stat.is-stop  .stat-aviso { color: var(--sobre-navy-stop);   border: 1px solid var(--sobre-navy-stop); }
 
 .spark-wrap { margin-top: 9px; }
 .spark-legend {
@@ -262,9 +308,11 @@ button { background: none; border: none; cursor: pointer; }
 }
 .spark-legend i { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 4px; vertical-align: -1px; }
 
-.queue { display: flex; flex-direction: column; gap: 1px; background: var(--line-2); border: 1px solid var(--line-2); }
+.queue { display: flex; flex-direction: column; overflow: hidden;
+  background: var(--card); border: 1px solid rgba(255,255,255,.95); border-radius: 20px; }
+.q-item + .q-item { border-top: 1px solid var(--line); }
 .q-item {
-  background: var(--panel); padding: 15px 17px;
+  background: none; padding: 16px 20px;
   display: grid; gap: 4px 16px;
   grid-template-columns: auto 1fr auto; align-items: start;
 }
@@ -272,7 +320,7 @@ button { background: none; border: none; cursor: pointer; }
   font-family: var(--mono); font-size: 10px; font-weight: 700; color: var(--acento);
   letter-spacing: .5px; padding-top: 3px; min-width: 22px;
 }
-.q-title { color: var(--cream); font-family: var(--display); font-size: 18px; font-weight: 600; line-height: 1.25; }
+.q-title { color: var(--navy); font-family: var(--display); font-size: 18px; font-weight: 600; line-height: 1.25; }
 .q-why { font-size: 13px; color: var(--text); margin-top: 3px; max-width: 72ch; }
 .q-act {
   margin-top: 7px; font-family: var(--mono); font-size: 10px;
@@ -319,7 +367,8 @@ button { background: none; border: none; cursor: pointer; }
 .tbtn:active { transform: translateY(1px); }
 .toolbar-count { margin-left: auto; font-family: var(--mono); font-size: 9.5px; color: var(--muted); letter-spacing: .6px; }
 
-.table-scroll { overflow-x: auto; border: 1px solid var(--line-2); }
+.table-scroll { overflow-x: auto; border: 1px solid rgba(255,255,255,.95);
+  border-radius: 20px; background: var(--card); }
 table.pipe { width: 100%; border-collapse: collapse; min-width: 720px; }
 table.pipe thead th {
   background: var(--panel-2); text-align: left; padding: 10px 12px;
@@ -338,7 +387,7 @@ table.pipe tbody tr:hover, table.pipe tbody tr:focus-visible { background: var(-
 table.pipe tbody tr[aria-selected="true"] { background: var(--raise); box-shadow: inset 3px 0 0 var(--acento); }
 table.pipe td { padding: 11px 12px; vertical-align: middle; font-size: 13.5px; }
 .td-code { font-family: var(--mono); font-size: 9.5px; color: var(--muted); letter-spacing: .4px; white-space: nowrap; }
-.td-name { color: var(--cream); font-family: var(--display); font-size: 16px; font-weight: 600; line-height: 1.25; }
+.td-name { color: var(--navy); font-family: var(--display); font-size: 16px; font-weight: 600; line-height: 1.25; }
 .td-vert { font-family: var(--mono); font-size: 9.5px; color: var(--muted); letter-spacing: .4px; margin-top: 2px; }
 
 .score-cell { display: flex; align-items: center; gap: 10px; min-width: 128px; }
@@ -462,14 +511,15 @@ section.section, .work-main { scroll-margin-top: 66px; }
 .deal-tabs { display: flex; gap: 10px; align-items: center; margin-bottom: 12px; flex-wrap: wrap; }
 .deal-ref { margin-left: auto; font-family: var(--mono); font-size: 9px;
   letter-spacing: 1.1px; color: var(--faint); text-transform: uppercase; }
-#drPane { border: 1px solid var(--line); background: var(--panel); padding: 20px; }
+#drPane { border: 1px solid rgba(255,255,255,.95); background: var(--card);
+  border-radius: 24px; padding: 24px; }
 
 .detail {
-  margin-top: 0; border: 1px solid var(--line);
-  background: var(--panel); padding: 20px;
+  margin-top: 0; border: 1px solid rgba(255,255,255,.95);
+  background: var(--card); border-radius: 24px; padding: 24px;
 }
 .detail-head { display: flex; justify-content: space-between; gap: 18px; flex-wrap: wrap; align-items: flex-start; }
-.detail-title { color: var(--cream); font-family: var(--display); font-size: 24px; font-weight: 600; line-height: 1.2; }
+.detail-title { color: var(--navy); font-family: var(--display); font-size: 24px; font-weight: 600; line-height: 1.2; }
 .detail-meta { font-family: var(--mono); font-size: 9.5px; color: var(--muted); letter-spacing: .6px; margin-top: 4px; }
 .detail-score { text-align: right; }
 .detail-score-n {
@@ -591,7 +641,11 @@ section.section, .work-main { scroll-margin-top: 66px; }
 .cal-grid { display: grid; gap: 18px; grid-template-columns: 1fr; }
 @media (min-width: 620px)  { .cal-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (min-width: 1500px) { .cal-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
-.card { border: 1px solid var(--line-2); background: var(--panel); padding: 17px 18px; }
+/* La tarjeta del dossier: blanco translucido sobre el panel azul,
+   borde blanco y esquina de 24. El borde gris de antes se leia como una
+   caja; este se lee como una lamina. */
+.card { border: 1px solid rgba(255,255,255,.95); background: var(--card);
+  border-radius: 24px; padding: 22px 24px; }
 .card h3 {
   font-family: var(--mono); font-size: 9px; font-weight: 700; letter-spacing: 1.3px;
   color: var(--acento); text-transform: uppercase; margin-bottom: 4px;
@@ -613,10 +667,12 @@ section.section, .work-main { scroll-margin-top: 66px; }
   padding: 14px 0; line-height: 1.6;
 }
 
-.layers { display: flex; flex-direction: column; gap: 1px; background: var(--line-2); border: 1px solid var(--line-2); }
-.layer { background: var(--panel); padding: 13px 16px; display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
+.layers { display: flex; flex-direction: column; overflow: hidden;
+  background: var(--card); border: 1px solid rgba(255,255,255,.95); border-radius: 20px; }
+.layer + .layer { border-top: 1px solid var(--line); }
+.layer { background: none; padding: 15px 20px; display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
 .layer-n { font-family: var(--mono); font-size: 10px; font-weight: 700; color: var(--acento); min-width: 54px; letter-spacing: .6px; }
-.layer-name { color: var(--cream); font-family: var(--display); font-size: 17px; font-weight: 600; min-width: 150px; }
+.layer-name { color: var(--navy); font-family: var(--display); font-size: 17px; font-weight: 600; min-width: 150px; }
 .layer-desc { font-size: 12.5px; color: var(--muted); flex: 1; min-width: 190px; }
 
 .foot {
@@ -687,7 +743,8 @@ table.pipe td select.ck-est { background: var(--panel-2); border: 1px solid var(
   color: inherit; font-family: var(--mono); font-size: 9px; letter-spacing: .6px;
   padding: 4px 6px; border-radius: 2px; }
 /* ── FORMULARIOS ──────────────────────────────────────────────────────── */
-.frm { border: 1px solid var(--line); background: var(--panel-2); padding: 17px 18px; margin-top: 18px; }
+.frm { border: 1px solid rgba(255,255,255,.95); background: rgba(255,255,255,.55);
+  border-radius: 20px; padding: 20px 22px; margin-top: 18px; }
 .frm h4 { font-family: var(--mono); font-size: 9px; font-weight: 700; letter-spacing: 1.3px;
   color: var(--acento); text-transform: uppercase; margin-bottom: 14px; }
 .frm-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); }
@@ -793,9 +850,10 @@ table.pipe td select.ck-est { background: var(--panel-2); border: 1px solid var(
 /* La bandeja de hoy. Filas densas, una linea por cosa: es para mirarla
    de pasada y decidir, no para leerla. */
 .hoy-tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
-.hoy-lista { display: flex; flex-direction: column; gap: 1px;
-  background: var(--line-2); border: 1px solid var(--line-2); }
-.hoy-fila { background: var(--panel); padding: 11px 14px; cursor: pointer;
+.hoy-lista { display: flex; flex-direction: column; overflow: hidden;
+  background: var(--card); border: 1px solid rgba(255,255,255,.95); border-radius: 20px; }
+.hoy-fila + .hoy-fila { border-top: 1px solid var(--line); }
+.hoy-fila { background: none; padding: 13px 18px; cursor: pointer;
   display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
 .hoy-fila:hover { background: var(--panel-2); }
 .hoy-exp { font-family: var(--serif); font-size: 14px; color: var(--cream);
@@ -1189,7 +1247,7 @@ table.pipe td select.ck-est { background: var(--panel-2); border: 1px solid var(
 .dr-cat:first-child { margin-top: 0; }
 .doc { border: 1px solid var(--line-2); background: var(--panel); padding: 15px 16px;
   display: flex; flex-direction: column; justify-content: space-between; gap: 12px; }
-.doc h4 { color: var(--cream); font-family: var(--display); font-size: 16px;
+.doc h4 { color: var(--navy); font-family: var(--display); font-size: 16px;
   font-weight: 600; line-height: 1.3; }
 .doc p { color: var(--muted); font-size: 12.5px; line-height: 1.5; margin-top: 5px; }
 .doc a { display: block; text-align: center; padding: 9px; background: var(--acento);
@@ -1222,7 +1280,7 @@ table.pipe td select.ck-est { background: var(--panel-2); border: 1px solid var(
   justify-content: center; padding: 24px;
   background: radial-gradient(circle at 50% 12%, rgba(31,92,158,.07), transparent 42%), var(--bg); }
 .abox { width: min(430px,100%); border: 1px solid var(--line); background: var(--panel); padding: 30px 28px; }
-.abox h1 { color: var(--cream); font-family: var(--display); font-weight: 600; font-size: 38px;
+.abox h1 { color: var(--navy); font-family: var(--display); font-weight: 600; font-size: 38px;
   line-height: 1; letter-spacing: -.5px; margin: 14px 0 10px; }
 .abox h1 span { color: var(--acento); }
 .abox p { color: var(--muted); font-size: 12.5px; line-height: 1.6; margin-bottom: 20px; }
@@ -1278,6 +1336,27 @@ table.pipe td select.ck-est { background: var(--panel-2); border: 1px solid var(
 .loading { padding: 60px 0; text-align: center; color: var(--muted);
   font-family: var(--mono); font-size: 10px; letter-spacing: 1.4px; }
 
+
+/* ── EL REDONDEO DEL DOSSIER, EN TODO LO DEMAS ───────────────────────
+   Las cajas se redondean; las FILAS de una lista o una tabla no, que
+   ahi la regla recta es lo que alinea. Los avisos con filete lateral
+   llevan el perfil del dossier -- 4 px del lado del filete, 14 del
+   otro -- que es como marca sus cargas registrales. */
+.gonogo, .doc, .abox, .prosa, .govern, .dr-cat, .ck-edit,
+.g-tabla-caja, .g-lee, .cod-frm, .cod-llamada, .ingesta,
+.dec-lista, .acc-lista, .out-lista, .lever { border-radius: 16px; }
+.gonogo, .doc, .abox, .prosa { overflow: hidden; }
+
+.reserva, .aviso-precio, .merc-caduco, .readonly-note, .banner,
+.pendiente, .alta-aviso, .regnote { border-radius: 4px 14px 14px 4px; }
+
+.ancla, .stat-aviso, .pill, .flag, .rolepill { border-radius: 999px; }
+.ancla { border-radius: 14px; }
+.btn-oro, .btn-mini, .tbtn, .linkbtn, .td-cod-btn { border-radius: 999px; }
+.linkbtn, .td-cod-btn { border-radius: 0; }
+input[type=text], input[type=number], input[type=email], input[type=search],
+select, textarea { border-radius: 10px; }
+.table-scroll table { border-radius: inherit; }
 </style>
 </head>
 <body>
@@ -1459,6 +1538,6 @@ table.pipe td select.ck-est { background: var(--panel-2); border: 1px solid var(
 
 <div class="loading" id="boot">CONECTANDO&hellip;</div>
 
-<script type="module" src="./app.js?v=2026-10-14a"></script>
+<script type="module" src="./app.js?v=2026-10-16a"></script>
 </body>
 </html>

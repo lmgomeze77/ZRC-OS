@@ -27,7 +27,7 @@ const EXT_OK = ['pdf','doc','docx','xls','xlsx','ppt','pptx','csv','txt','rtf',
 // copia vieja de su cache: eso, y no un despliegue parado, es lo que hace
 // que una actualizacion publicada no se vea. Hay que subir las dos a la
 // vez: esta constante y el ?v= de index.html.
-const VERSION = '2026-10-14a';
+const VERSION = '2026-10-16a';
 const VERSION_PEDIDA = new URL(import.meta.url).searchParams.get('v');
 
 function sellaVersion() {
@@ -387,7 +387,7 @@ function tarjetaRiesgo() {
     <div class="stat-value">${ult.valor}<small>${flecha} ${Math.abs(delta)}</small></div>
     ${corto.length > 1 ? `<div class="spark-wrap">${sparkline(corto)}</div>` : ''}
     <div class="stat-sub">${dias > 2
-      ? `<b style="color:var(--amber)">${dias} días sin actualizar</b>`
+      ? `<b style="color:var(--sobre-navy-alerta)">${dias} días sin actualizar</b>`
       : `${esc(ult.fecha)} · ${corto.length} últimos días`}</div></div>`;
 }
 

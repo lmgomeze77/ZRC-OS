@@ -63,14 +63,14 @@ select o.id, o.codigo, o.nombre,
 
 union all
 select o.id, o.codigo, o.nombre, 'sin_codigo',
-       'Sin codigo de expediente con el patron ZRC-[TIPO]-[ANIO]-[GEO]-[NN] (§12.3)', 4,
+       'Sin código de expediente con el patrón ZRC-[TIPO]-[AÑO]-[GEO]-[NN] (§12.3)', 4,
        null::date
   from vivos o
  where o.codigo is null
 
 union all
 select o.id, o.codigo, o.nombre, 'sin_puntuar',
-       'Sin puntuacion completa contra las rubricas ancladas', 5,
+       'Sin puntuación completa contra las rúbricas ancladas', 5,
        null::date
   from vivos o
   left join v_opportunity_scores v on v.opportunity_id = o.id

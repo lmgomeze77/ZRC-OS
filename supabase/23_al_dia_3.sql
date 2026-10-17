@@ -646,8 +646,8 @@ select m.fecha, m.valor, m.estado, 'mesas'::text as metodo, m.cobertura,
 create view v_pendientes_firma
   with (security_invoker = true) as
 select 'indice_caducado'::text as motivo,
-       'Indice de mesas sin actualizar desde ' || to_char(e.fecha, 'DD/MM')
-         || ' (' || e.dias_sin_actualizar || ' dias). El barrido esta parado.' as detalle,
+       'Índice de mesas sin actualizar desde ' || to_char(e.fecha, 'DD/MM')
+         || ' (' || e.dias_sin_actualizar || ' días). El barrido está parado.' as detalle,
        1 as prioridad, e.fecha + 1 as vence_en
   from v_risk_estado e where e.caducado
 union all

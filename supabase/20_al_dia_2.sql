@@ -97,8 +97,8 @@ select u.fecha, u.valor, u.estado, u.origen, u.cobertura,
 create or replace view v_pendientes_firma
   with (security_invoker = true) as
 select 'indice_caducado'::text as motivo,
-       'Indice de riesgo sin actualizar desde ' || to_char(e.fecha, 'DD/MM')
-         || ' (' || e.dias_sin_actualizar || ' dias). El barrido de mesas esta parado.' as detalle,
+       'Índice de riesgo sin actualizar desde ' || to_char(e.fecha, 'DD/MM')
+         || ' (' || e.dias_sin_actualizar || ' días). El barrido de mesas está parado.' as detalle,
        1 as prioridad,
        e.fecha + 1 as vence_en
   from v_risk_estado e
@@ -137,13 +137,13 @@ grant insert, update, delete on risk_mesas, risk_lecturas to authenticated;
 grant select on v_risk_dia, v_risk_serie, v_risk_estado, v_pendientes_firma to authenticated;
 
 insert into risk_mesas (clave, nombre, orden, peso, descripcion) values
-  ('M1','Macro y tipos',            1, 1, 'Tipos, inflacion y coste de la deuda. Mueve todos los multiplos a la vez.'),
-  ('M2','Financiacion bancaria',    2, 1, 'Apetito del banco para operaciones medianas. Sin deuda, se cae el comprador apalancado.'),
-  ('M3','Mercado de capitales',     3, 1, 'Salidas, colocaciones y apetito del inversor institucional por Espana.'),
-  ('M4','Regulatorio y fiscal',     4, 1, 'Cambios que mueven sectores enteros: vivienda, energia, suelo turistico.'),
-  ('M5','Inmobiliario',             5, 1, 'Precio, absorcion y liquidez del ladrillo, por ser la mitad del pipeline.'),
-  ('M6','Agroalimentario',          6, 1, 'Campana, agua y precios. La otra mitad del pipeline.'),
-  ('M7','Politico e institucional', 7, 1, 'Estabilidad, calendario electoral, seguridad juridica.'),
+  ('M1','Macro y tipos',            1, 1, 'Tipos, inflación y coste de la deuda. Mueve todos los múltiplos a la vez.'),
+  ('M2','Financiación bancaria',    2, 1, 'Apetito del banco para operaciones medianas. Sin deuda, se cae el comprador apalancado.'),
+  ('M3','Mercado de capitales',     3, 1, 'Salidas, colocaciones y apetito del inversor institucional por España.'),
+  ('M4','Regulatorio y fiscal',     4, 1, 'Cambios que mueven sectores enteros: vivienda, energía, suelo turístico.'),
+  ('M5','Inmobiliario',             5, 1, 'Precio, absorción y liquidez del ladrillo, por ser la mitad del pipeline.'),
+  ('M6','Agroalimentario',          6, 1, 'Campaña, agua y precios. La otra mitad del pipeline.'),
+  ('M7','Político e institucional', 7, 1, 'Estabilidad, calendario electoral, seguridad jurídica.'),
   ('M8','Divisa y exterior',        8, 1, 'Lo que afecta al comprador extranjero, que es quien paga la prima.'),
   ('M9','Contraparte y crediticio', 9, 1, 'Morosidad, concursos y solvencia del tejido mediano.')
 on conflict (clave) do nothing;   -- do nothing, no update: si ya los habeis

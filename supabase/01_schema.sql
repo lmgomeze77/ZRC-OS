@@ -344,12 +344,12 @@ select o.id as opportunity_id, o.codigo, o.nombre,
  where f.nivel = 'stop' and f.resuelto_en is null
 union all
 select o.id, o.codigo, o.nombre, 'sin_codigo',
-       'Sin codigo de expediente: bloquea el registro formal (§12.3)', 2
+       'Sin código de expediente: bloquea el registro formal (§12.3)', 2
   from opportunities o
  where o.codigo is null
 union all
 select o.id, o.codigo, o.nombre, 'sin_puntuar',
-       'Sin puntuacion completa contra las rubricas ancladas', 3
+       'Sin puntuación completa contra las rúbricas ancladas', 3
   from opportunities o
   left join v_opportunity_scores v on v.opportunity_id = o.id
  where v.dealscore is null;

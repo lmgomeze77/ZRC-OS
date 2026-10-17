@@ -60,14 +60,14 @@ select o.id, o.codigo, o.nombre,
 
 union all
 select o.id, o.codigo, o.nombre, 'sin_codigo',
-       'Sin codigo de expediente con el patron ZRC-[TIPO]-[ANIO]-[GEO]-[NN] (§12.3)', 4,
+       'Sin código de expediente con el patrón ZRC-[TIPO]-[AÑO]-[GEO]-[NN] (§12.3)', 4,
        null::date
   from vivos o
  where o.codigo is null
 
 union all
 select o.id, o.codigo, o.nombre, 'sin_puntuar',
-       'Sin puntuacion completa contra las rubricas ancladas', 5,
+       'Sin puntuación completa contra las rúbricas ancladas', 5,
        null::date
   from vivos o
   left join v_opportunity_scores v on v.opportunity_id = o.id
@@ -372,12 +372,12 @@ grant select on v_sector_score, v_sector_pipeline to authenticated;
 
 insert into sectors (clave, nombre, orden, descripcion) values
   ('INM-RES','Inmobiliario residencial y mixto', 1,'Edificios en renta o para reposicionar en plaza urbana.'),
-  ('INM-HTL','Inmobiliario hotelero',            2,'Activo hotelero en explotacion o para reconversion.'),
-  ('SUELO',  'Suelo y promocion',                3,'Suelo finalista, turistico o rustico con recorrido urbanistico.'),
-  ('AGRO',   'Agroalimentario',                  4,'Explotacion, transformacion y agroindustria.'),
-  ('IND',    'Industrial y servicios B2B',       5,'Taller, construccion, distribucion y servicios a empresa.'),
-  ('TECH',   'Tecnologia y venture',             6,'Fundraising de compania temprana o en crecimiento.'),
-  ('REEST',  'Situaciones especiales',           7,'Reestructuracion, capital de urgencia y preconcursal.')
+  ('INM-HTL','Inmobiliario hotelero',            2,'Activo hotelero en explotación o para reconversión.'),
+  ('SUELO',  'Suelo y promoción',                3,'Suelo finalista, turístico o rústico con recorrido urbanístico.'),
+  ('AGRO',   'Agroalimentario',                  4,'Explotación, transformación y agroindustria.'),
+  ('IND',    'Industrial y servicios B2B',       5,'Taller, construcción, distribución y servicios a empresa.'),
+  ('TECH',   'Tecnología y venture',             6,'Fundraising de compañía temprana o en crecimiento.'),
+  ('REEST',  'Situaciones especiales',           7,'Reestructuración, capital de urgencia y preconcursal.')
 on conflict (clave) do update set nombre = excluded.nombre, orden = excluded.orden;
 
 insert into sector_map (vertical, sector) values
@@ -397,13 +397,13 @@ insert into sector_map (vertical, sector) values
 on conflict (vertical) do update set sector = excluded.sector;
 
 insert into sector_dimensions (clave, nombre, peso, orden, descripcion) values
-  ('S1','Profundidad de compradores',   0.20, 1,'Cuantos compradores activos y de cuantos tipos. Decide si hay proceso o conversacion unica.'),
-  ('S2','Capital dirigido al sector',   0.15, 2,'Dinero levantado con mandato explicito para este sector en Espana.'),
-  ('S3','Multiplos y su tendencia',     0.15, 3,'Nivel y direccion. Barato y expandiendo bate a caro y comprimiendo.'),
-  ('S4','Consolidacion en marcha',      0.15, 4,'Si hay buy-and-build activo, hay comprador recurrente y conocido.'),
-  ('S5','Fragmentacion del vendedor',   0.15, 5,'Es lo que produce objetos originables del tamano de ZRC.'),
-  ('S6','Viento regulatorio y fiscal',  0.10, 6,'En Espana mueve sectores enteros: vivienda, energia, suelo turistico.'),
-  ('S7','Financiacion disponible',      0.10, 7,'Sin deuda para el sector, se cae el comprador apalancado.')
+  ('S1','Profundidad de compradores',   0.20, 1,'Cuántos compradores activos y de cuántos tipos. Decide si hay proceso o conversación única.'),
+  ('S2','Capital dirigido al sector',   0.15, 2,'Dinero levantado con mandato explícito para este sector en España.'),
+  ('S3','Múltiplos y su tendencia',     0.15, 3,'Nivel y dirección. Barato y expandiendo bate a caro y comprimiendo.'),
+  ('S4','Consolidación en marcha',      0.15, 4,'Si hay buy-and-build activo, hay comprador recurrente y conocido.'),
+  ('S5','Fragmentación del vendedor',   0.15, 5,'Es lo que produce objetos originables del tamaño de ZRC.'),
+  ('S6','Viento regulatorio y fiscal',  0.10, 6,'En España mueve sectores enteros: vivienda, energía, suelo turístico.'),
+  ('S7','Financiación disponible',      0.10, 7,'Sin deuda para el sector, se cae el comprador apalancado.')
 on conflict (clave) do update
   set nombre = excluded.nombre, peso = excluded.peso,
       orden = excluded.orden, descripcion = excluded.descripcion;

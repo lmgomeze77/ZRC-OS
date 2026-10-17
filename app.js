@@ -27,7 +27,7 @@ const EXT_OK = ['pdf','doc','docx','xls','xlsx','ppt','pptx','csv','txt','rtf',
 // copia vieja de su cache: eso, y no un despliegue parado, es lo que hace
 // que una actualizacion publicada no se vea. Hay que subir las dos a la
 // vez: esta constante y el ?v= de index.html.
-const VERSION = '2026-10-16a';
+const VERSION = '2026-10-17a';
 const VERSION_PEDIDA = new URL(import.meta.url).searchParams.get('v');
 
 function sellaVersion() {
@@ -1223,8 +1223,8 @@ function formSector() {
         `<option value="${esc(r.sector)}"${r.sector === sel ? ' selected' : ''}>${esc(r.nombre)}</option>`).join('')}</select>
     </div>
     <div class="pista" style="margin-bottom:16px">
-      La lectura es de un dia: el score toma solo las dimensiones de la fecha mas
-      reciente. Si puntuas cuatro hoy y tres manana, manana el sector se queda con
+      La lectura es de un día: el score toma sólo las dimensiones de la fecha más
+      reciente. Si puntúas cuatro hoy y tres mañana, mañana el sector se queda con
       la cobertura de esas tres. <b>Haz las siete de una vez.</b>
     </div>
     ${state.secDims.map(d => {
@@ -1827,7 +1827,7 @@ function panelDecision(r) {
       <div class="fld ancho"><button class="btn-oro" id="outGuardar">${out ? 'ACTUALIZAR DESENLACE' : 'REGISTRAR DESENLACE'}</button></div>
     </div>
     <div class="pista">Registrar el desenlace cierra el expediente: pasa a
-      <b>cerrado</b> o <b>archivado</b> segun el resultado, y sale de la cola de pendientes.
+      <b>cerrado</b> o <b>archivado</b> según el resultado, y sale de la cola de pendientes.
       Su banda sigue diciendo lo que dice la puntuación; el desenlace dice lo que pasó.</div>
     <div class="frm-msg" id="outMsg"></div>
   </div>`;
